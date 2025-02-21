@@ -1,0 +1,9 @@
+mCRC_ILC/
+.RDataTmp*
+*.csv
+.DS_Store
+__pycache__
+*.pdf
+plots/
+*.Rproj
+articles/
