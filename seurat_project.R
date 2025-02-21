@@ -95,7 +95,7 @@ bcmvn_s1 <- find.pK(sweep.stats_s1)
 ggplot(bcmvn_s1, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
 #0.29 max
 pK <- bcmvn_s1[bcmvn_s1$BCmetric == max(bcmvn_s1$BCmetric), "pK"]
-pK <- as.numeric(as.character(pK)) #choosing 1st value from list and converting to numeric
+pK <- as.numeric(as.character(pK)) 
 pK
 
 #Homotypic doublet proportion estimate
@@ -254,10 +254,8 @@ bcmvn_s3 <- find.pK(sweep.stats_s3)
 
 ggplot(bcmvn_s3, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
 #0.25 max
-pK <- bcmvn_s3 %>% #select pK that corresponds to max bcmvn to optimize doublet detection
-  filter(BCmetric == max(BCmetric)) %>%
-  select(pK) #list
-pK <- as.numeric(as.character(pK[[1]])) #choosing 1st value from list and converting to numeric
+pK <- bcmvn_s3[bcmvn_s3$BCmetric == max(bcmvn_s3$BCmetric), "pK"]
+pK <- as.numeric(as.character(pK))
 pK
 
 #Homotypic doublet proportion estimate
@@ -337,10 +335,8 @@ bcmvn_s4 <- find.pK(sweep.stats_s4)
 
 ggplot(bcmvn_s4, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
 #0.3 max
-pK <- bcmvn_s4 %>% #select pK that corresponds to max bcmvn to optimize doublet detection
-  filter(BCmetric == max(BCmetric)) %>%
-  select(pK) #list
-pK <- as.numeric(as.character(pK[[1]])) #choosing 1st value from list and converting to numeric
+pK <- bcmvn_s4[bcmvn_s4$BCmetric == max(bcmvn_s4$BCmetric), "pK"]
+pK <- as.numeric(as.character(pK))
 pK
 
 #Homotypic doublet proportion estimate
@@ -507,10 +503,8 @@ bcmvn_s6 <- find.pK(sweep.stats_s6)
 
 ggplot(bcmvn_s6, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
 #0.2
-pK <- bcmvn_s6 %>% #select pK that corresponds to max bcmvn to optimize doublet detection
-  filter(BCmetric == max(BCmetric)) %>%
-  select(pK) #list
-pK <- as.numeric(as.character(pK[[1]])) #choosing 1st value from list and converting to numeric
+pK <- bcmvn_s6[bcmvn_s6$BCmetric == max(bcmvn_s6$BCmetric), "pK"]
+pK <- as.numeric(as.character(pK))
 pK
 
 #Homotypic doublet proportion estimate
@@ -592,10 +586,8 @@ bcmvn_s7 <- find.pK(sweep.stats_s7)
 
 ggplot(bcmvn_s7, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
 #0.16
-pK <- bcmvn_s7 %>% #select pK that corresponds to max bcmvn to optimize doublet detection
-  filter(BCmetric == max(BCmetric)) %>%
-  select(pK) #list
-pK <- as.numeric(as.character(pK[[1]])) #choosing 1st value from list and converting to numeric
+pK <- bcmvn_s7[bcmvn_s7$BCmetric == max(bcmvn_s7$BCmetric), "pK"]
+pK <- as.numeric(as.character(pK))
 pK
 
 #Homotypic doublet proportion estimate
@@ -677,10 +669,8 @@ bcmvn_s8 <- find.pK(sweep.stats_s8)
 
 ggplot(bcmvn_s8, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
 #0.15
-pK <- bcmvn_s8 %>% #select pK that corresponds to max bcmvn to optimize doublet detection
-  filter(BCmetric == max(BCmetric)) %>%
-  select(pK) #list
-pK <- as.numeric(as.character(pK[[1]])) #choosing 1st value from list and converting to numeric
+pK <- bcmvn_s8[bcmvn_s8$BCmetric == max(bcmvn_s8$BCmetric), "pK"]
+pK <- as.numeric(as.character(pK))
 pK
 
 #Homotypic doublet proportion estimate
@@ -820,7 +810,7 @@ expression_df$cell_id <- rownames(expression_df)
 expression_df <- expression_df[, c(ncol(expression_df), 1:(ncol(expression_df) - 1))]
 write.csv(expression_df, file = "seurat_expression.csv", row.names = FALSE, quote = FALSE)
 
-predictions <- read.csv("/Users/gerdalukosiute/Downloads/Thesis/predicted_labels.csv")
+predictions <- read.csv("/Users/gerdalukosiute/Downloads/Thesis/analysis_mCRC/predicted_labels.csv")
 head(predictions)
 rownames(predictions) <- predictions$cell_id
 merged_object <- AddMetaData(merged_object, metadata = predictions$predicted_label, col.name = "celltypist_labels")
@@ -892,6 +882,7 @@ GSEA_result <- gseGO(
   pAdjustMethod = "BH",
   pvalueCutoff = 0.05
 )
+#PLOT MISSING!!
 
 #KEGG enrichment (to focus on cytokine related pathways)
 
