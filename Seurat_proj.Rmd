@@ -946,16 +946,16 @@ compareClusterResult <- compareCluster(
 )
 ```
 
-## GSEA
+## GSEA -> represents the enrichment score of a gene set (e.g. a biological pathway) across a ranked list of genes and helps identify whether a particular set of genes is upregulated or downregulated in a comparison (e.g., NK vs. ILC1 cells).
 
 ``` {r gsea, echo = TRUE}
 #Markers for NK vs ILC1
 NK_vs_ILC1_DEGs <- FindMarkers(
   merged_object, 
-  ident.1 = c(0, 1, 2, 3, 6), 
-  ident.2 = 4,                
-  min.pct = 0.1, 
-  logfc.threshold = 0
+  ident.1 = c(0, 1, 2, 3, 6), # NK cells
+  ident.2 = 4,                # ILC1 cells
+  min.pct = 0.1,              # threshold of expression in either group
+  logfc.threshold = 0         
 )
 
 #Ranked gene list based on logFC
@@ -975,7 +975,14 @@ GSEA_result <- gseGO(
   pvalueCutoff = 0.05
 )
 
-#PLOT MISSING!!!!!!!!!!!!!!!
+# Dotplot of the enriched pathways
+dotplot(GSEA_result, showCategory = 20) + ggtitle("GSEA - NK vs ILC1")
+
+# Top 5
+ordered_gsea <- GSEA_result@result[order(GSEA_result@result$p.adjust), ]
+top5 <- head(ordered_gsea, 5)
+top5_geneSetID <- match(top5$ID, GSEA_result@result$ID)
+gseaplot2(GSEA_result, geneSetID = top5_geneSetID, title = "Top 5 Enriched Pathways")
 ```
 
 ## NK KEGG enrichment (to focus on cytokine related pathways)
