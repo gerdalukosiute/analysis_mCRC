@@ -119,7 +119,7 @@ table(s1_finalized@meta.data$DF.classifications_0.25_0.29_67)
 DimPlot(s1_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.29_67")
 
 ##Sample 2 --------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#QC
+#Quality control
 seurat_s2[["percent.mt"]] <- PercentageFeatureSet(seurat_s2, pattern = "^mt-") 
 #View(seurat_s2@meta.data)
 
@@ -752,7 +752,7 @@ print(top_markers, n = 200)
 
 markers_c0 <- FindConservedMarkers(merged_object, ident.1 = 0, grouping.var = "orig.ident")
 head(markers_c0)
-FeaturePlot(merged_object, features = c("Gzma"), min.cutoff = 'q10', reduction = "umap")
+FeaturePlot(merged_object, features = c("Gzma", "Gzmb", "Tmsb4x", "Prf1", "Actb", "Emb"), min.cutoff = 'q10', reduction = "umap")
 FeaturePlot(merged_object, features = c("Gzmb"), min.cutoff = 'q10', reduction = "umap")
 FeaturePlot(merged_object, features = c("Tmsb4x"), min.cutoff = 'q10', reduction = "umap")
 FeaturePlot(merged_object, features = c("Prf1"), min.cutoff = 'q10', reduction = "umap")
@@ -762,7 +762,7 @@ FeaturePlot(merged_object, features = c("Emb"), min.cutoff = 'q10', reduction = 
 #Cluster 1
 markers_c1 <- FindConservedMarkers(merged_object, ident.1 = 1, grouping.var = "orig.ident")
 head(markers_c1)
-FeaturePlot(merged_object, features = c("Ccr2"), min.cutoff = 'q10', reduction = "umap")
+FeaturePlot(merged_object, features = c("Ccr2", "Ccl5", "Gzmb", "Cd7", "Rap1b", "Ctla2a"), min.cutoff = 'q10', reduction = "umap")
 FeaturePlot(merged_object, features = c("Ccl5"), min.cutoff = 'q10', reduction = "umap")
 FeaturePlot(merged_object, features = c("Gzmb"), min.cutoff = 'q10', reduction = "umap")
 FeaturePlot(merged_object, features = c("Cd7"), min.cutoff = 'q10', reduction = "umap")
