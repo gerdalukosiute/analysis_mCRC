@@ -24,7 +24,7 @@ library(metap)
 library(clusterProfiler)
 library(org.Mm.eg.db)
 library(enrichplot)
-
+library(cluster)
 ```
 
 ## Initially I exclude sample 5, since it has insufficient data to contribute to the analysis efficiently. I will try to subsequently save it in a later chunck.
@@ -900,7 +900,7 @@ table(merged_object@meta.data$celltypist_labels)
 
 ``` {r subset, echo = TRUE}
 FeaturePlot(merged_object, features = c("Cd3e", "Cd3d", "Tbx21", "Eomes", "Cd8b1", "Nkg7", "Gzmb"), min.cutoff = 'q10', reduction = "umap")
-NK_cells_maybe <- subset(merged_object, subset = seurat_clusters %in% c(0, 1, 2, 3, 6))
+NK_cells_maybe <- subset(merged_object, subset = seurat_clusters %in% c(0, 1, 2, 3, 6)) #4258
 ILC1_cells_maybe <- subset(merged_object, subset = seurat_clusters %in% c(4))
 ```
 
@@ -985,7 +985,7 @@ top5_geneSetID <- match(top5$ID, GSEA_result@result$ID)
 gseaplot2(GSEA_result, geneSetID = top5_geneSetID, title = "Top 5 Enriched Pathways")
 ```
 
-## NK KEGG enrichment (to focus on cytokine related pathways)
+## NK KEGG enrichment -> to focus on cytokine related pathways. Also provides some indirect insight into pathways where cytokine receptors play a role.
 
 ``` {r nk kegg, echo = TRUE}
 #Gene symbols to ENTREZ IDs
@@ -1043,4 +1043,160 @@ ILC1_cytokine_pathways <- ILC1_KEGG@result[
   grep("cytokine|TNF|JAK|STAT|interferon|TGF", ILC1_KEGG@result$Description, ignore.case = TRUE), ]
 
 head(ILC1_cytokine_pathways$Description, 50)
+```
+
+# Exhausted vs Mature NK subsets. Version 1: very restrictive, poor classification and scope
+## Exhausted NK Cells: Low Itgam, Cd27, Gzmb, Gzma, Prf1, High Klrg1
+## Mature NK Cells: High Itgam, Cd27, Gzmb, Gzma, Prf1, Low Klrg1
+
+``` {r mature vs exhausted, echo = TRUE}
+# Visualization
+VlnPlot(NK_cells_maybe, features = c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1"), group.by = "seurat_clusters")
+
+# More extensive for visualizing, but too strict for subsetting :(
+FeaturePlot(NK_cells_maybe, features = c(
+  "Lamp1", "Prf1", "Gzmb", "Gzma", "Eomes", "Tbx21", "Klrg1", "Tnf", "Ifng", 
+  "Klrd1", "Klrc2", "Itgam", "Cd27", "Gzmb", "Prf1" 
+), min.cutoff = 'q10', reduction = "umap")
+
+VlnPlot(NK_cells_maybe, features = c(
+  "Lamp1", "Prf1", "Gzmb", "Gzma", "Eomes", "Tbx21", "Klrg1", "Tnf", "Ifng", 
+  "Klrd1", "Klrc2", "Itgam", "Cd27", "Gzmb", "Prf1" 
+), group.by = "seurat_clusters")
+
+# Define new marker lists
+subset_markers <- c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1")
+
+# Ensure only existing markers are used
+valid_markers <- subset_markers[subset_markers %in% rownames(NK_cells_maybe@assays$RNA@features)]
+valid_markers
+
+# Fetch expression data for valid markers
+expr_data <- FetchData(NK_cells_maybe, vars = valid_markers)
+
+# See distribution
+summary(expr_data)
+
+# Define dynamic quantile cutoffs (less restrictive)
+low_threshold <- apply(expr_data, 2, function(x) quantile(x[x > 0], 0.33, na.rm = TRUE))  # Lower 40% (excluding zeros)
+high_threshold <- apply(expr_data, 2, function(x) quantile(x[x > 0], 0.66, na.rm = TRUE)) # Upper 60% (excluding zeros)
+
+# Use mean for Klrg1 as a cutoff (since median is 0)
+klrg1_cutoff <- mean(expr_data$Klrg1[expr_data$Klrg1 > 0])
+
+
+# Identify exhausted NK cells (Low: Itgam, Gzmb, Gzma, Prf1; High: Klrg1)
+exhausted_cells <- rownames(expr_data)[
+  expr_data$Itgam < low_threshold["Itgam"] & 
+  expr_data$Gzmb < low_threshold["Gzmb"] & 
+  expr_data$Prf1 < low_threshold["Prf1"] & 
+  expr_data$Klrg1 > klrg1_cutoff  # Klrg1 presence is enough
+]
+
+# Identify mature NK cells (High: Itgam, Gzmb, Gzma, Prf1; Low: Klrg1)
+mature_cells <- rownames(expr_data)[
+  expr_data$Itgam > high_threshold["Itgam"] & 
+  expr_data$Gzmb > high_threshold["Gzmb"] & 
+  expr_data$Prf1 > high_threshold["Prf1"] & 
+  expr_data$Klrg1 < klrg1_cutoff  # Klrg1 absence is enough
+]
+
+# Subset exhausted NK cells
+if (length(exhausted_cells) > 0) {
+  exhausted_NK_1 <- subset(NK_cells_maybe, cells = exhausted_cells)
+  print(paste("Subset successful: Retained", length(exhausted_cells), "exhausted NK cells."))
+} else {
+  print("No exhausted NK cells found. Try adjusting the quantile cutoffs.")
+}
+
+# Subset mature NK cells
+if (length(mature_cells) > 0) {
+  mature_NK_1 <- subset(NK_cells_maybe, cells = mature_cells)
+  print(paste("Subset successful: Retained", length(mature_cells), "mature NK cells."))
+} else {
+  print("No mature NK cells found. Try adjusting the quantile cutoffs.")
+}
+```
+
+# Clustering method for NK subset characterization.
+## May be better, but also some weird behaviour. The terminally mature cells (aka expressing high Klrg1) seem to still retain high cytotoxic activity. 
+
+``` {r mature_vs_exhausted, echo = TRUE} 
+selected_genes <- c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1", "Ifng", "Pdcd1") #added PD-1
+
+expr_matrix <- FetchData(NK_cells_maybe, vars = selected_genes)
+
+# Normalize expression (Z-score transformation)
+expr_matrix_scaled <- scale(expr_matrix)
+
+# PCA on scaled expression data
+pca_result <- prcomp(expr_matrix_scaled, center = TRUE, scale. = TRUE)
+
+# K-nearest neighbor clustering
+set.seed(123)
+clustering <- pam(pca_result$x[, 1:5], k = 2)  # Use first 5 principal components
+
+# Assign clusters
+expr_matrix$Cluster <- as.factor(clustering$clustering)
+
+# Check avg expression per cluster
+avg_expr <- aggregate(expr_matrix[, selected_genes], by = list(expr_matrix$Cluster), FUN = mean)
+print(avg_expr)
+
+# new logic for using all markers
+score_exhaustion <- function(vec) {
+  vec["Klrg1"] + vec["Pdcd1"] - (vec["Cd27"] + vec["Itgam"] + vec["Gzmb"] + vec["Prf1"] + vec["Ifng"])
+}
+
+exhaustion_scores <- apply(avg_expr[, selected_genes], 1, score_exhaustion)
+exhausted_cluster <- as.numeric(avg_expr$Group.1[which.max(exhaustion_scores)])
+expr_matrix$Cluster <- as.factor(clustering$clustering)
+
+exhausted_cells <- rownames(expr_matrix)[expr_matrix$Cluster == exhausted_cluster]
+mature_cells <- rownames(expr_matrix)[expr_matrix$Cluster != exhausted_cluster]
+
+# Subset exhausted NKs
+if (length(exhausted_cells) > 0) {
+  exhausted_NK <- subset(NK_cells_maybe, cells = exhausted_cells)
+  print(paste("Subset successful: Retained", length(exhausted_cells), "exhausted NK cells."))
+} else {
+  print("No exhausted NK cells found. Try adjusting the clustering approach.")
+}
+
+# Subset mature NKs
+if (length(mature_cells) > 0) {
+  mature_NK <- subset(NK_cells_maybe, cells = mature_cells)
+  print(paste("Subset successful: Retained", length(mature_cells), "mature NK cells."))
+} else {
+  print("No mature NK cells found. Try adjusting the clustering approach.")
+}
+
+NK_cells_maybe$ME_Clustering <- expr_matrix$Cluster
+
+DimPlot(NK_cells_maybe, group.by = "ME_Clustering", reduction = "umap", label = TRUE)
+FeaturePlot(NK_cells_maybe, features = c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1", "Ifng", "Pdcd1"), reduction = "umap")
+
+#"Lamp1", "Prf1", "Gzmb", "Eomes", "Tbx21", "Klrg1", "Tnf", "Ifng", "Itgam", "Cd27", "Prf1"
+FeaturePlot(exhausted_NK, features = c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1", "Ifng", "Pdcd1"), reduction = "umap")
+FeaturePlot(mature_NK, features = c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1", "Ifng", "Pdcd1"), reduction = "umap")
+
+# DE markers in exhausted
+exhausted_vs_mature <- FindMarkers(NK_cells_maybe, ident.1 = exhausted_cells, ident.2 = mature_cells)
+head(exhausted_vs_mature) 
+
+exhausted_genes <- rownames(exhausted_vs_mature[exhausted_vs_mature$p_val_adj < 0.05 & exhausted_vs_mature$avg_log2FC > 1, ])
+
+# Map Ids
+exhausted_genes_entrez <- mapIds(
+  org.Mm.eg.db,
+  keys = exhausted_genes,
+  column = "ENTREZID",
+  keytype = "SYMBOL",
+  multiVals = "first"
+)
+
+exhausted_genes_entrez <- na.omit(exhausted_genes_entrez)
+
+enriched_pathways <- enrichKEGG(gene = exhausted_genes_entrez, organism = "mmu")
+dotplot(enriched_pathways)
 ```
