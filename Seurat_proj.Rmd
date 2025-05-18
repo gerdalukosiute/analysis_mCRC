@@ -25,6 +25,13 @@ library(clusterProfiler)
 library(org.Mm.eg.db)
 library(enrichplot)
 library(cluster)
+library(Nebulosa)
+library(dplyr)
+library(reshape2)
+library(ggrepel)
+library(enrichplot)
+library(EnhancedVolcano)
+library(DESeq2) 
 ```
 
 ## Initially I exclude sample 5, since it has insufficient data to contribute to the analysis efficiently. I will try to subsequently save it in a later chunck.
@@ -753,9 +760,8 @@ merged_object <- FindNeighbors(merged_object, dims = 1:20, reduction = "pca")
 merged_object <- FindClusters(merged_object, resolution = 2, cluster.name = "unintegrated_clusters")
 merged_object <- RunUMAP(merged_object, dims = 1:20, reduction = "pca", reduction.name = "umap.unintegrated")
 DimPlot(merged_object, reduction ="umap.unintegrated", group.by = c("orig.ident", "seurat_clusters"))
-#Integration
-merged_object <- IntegrateLayers(object = merged_object, method = CCAIntegration, orig.reduction = "pca", new.reduction = "integrated.cca",
-                                      verbose = FALSE)
+#Integration -> to account for sample differences
+merged_object <- IntegrateLayers(object = merged_object, method = CCAIntegration, orig.reduction = "pca", new.reduction = "integrated.cca", verbose = FALSE)
 
 merged_object <- JoinLayers(merged_object)
 head(merged_object)
@@ -764,14 +770,13 @@ tail(merged_object)
 merged_object <- FindNeighbors(merged_object, reduction = "integrated.cca", dims = 1:20)
 merged_object <- FindClusters(merged_object, resolution = 0.5, cluster.name = "integrated_clusters") #keep lower; increase based on cond
 merged_object <- RunUMAP(merged_object, dims = 1:20, reduction = "integrated.cca")
-DimPlot(merged_object, reduction = "umap", group.by = c("orig.ident", "seurat_clusters")) #should be c("orig.ident","seurat_annotations")
+DimPlot(merged_object, reduction = "umap", group.by = c("orig.ident", "seurat_clusters")) 
 DimPlot(merged_object, reduction = "umap", split.by = "orig.ident")
 ```
 
 ## This is a plot regarding the percentage of samples in each cluster.
 
 ``` {r percent per cluster, echo = TRUE}
-#plot as percent rather than just number 
 cell_counts <- table(merged_object$orig.ident, merged_object$integrated_clusters)
 cell_perc <- prop.table(cell_counts, margin = 1)*100
 percentages_df <- melt(cell_perc, varnames = c("Sample", "Cluster"), value.name = "Percentage")
@@ -895,308 +900,353 @@ merged_object <- AddMetaData(merged_object, metadata = predictions$predicted_lab
 table(merged_object@meta.data$celltypist_labels)
 ```
 
-## Subsetting for NK and ILC1 cells
-### Based on the celltypist_run.py and the feature plot below we deduce which cells are NK and ILC1. 
+# Initial NK and ILC1 subset
 
-``` {r subset, echo = TRUE}
+``` {r subset1, echo = TRUE}
 FeaturePlot(merged_object, features = c("Cd3e", "Cd3d", "Tbx21", "Eomes", "Cd8b1", "Nkg7", "Gzmb"), min.cutoff = 'q10', reduction = "umap")
-NK_cells_maybe <- subset(merged_object, subset = seurat_clusters %in% c(0, 1, 2, 3, 6)) #4258
-ILC1_cells_maybe <- subset(merged_object, subset = seurat_clusters %in% c(4))
+
+NK_and_ILC1 <- subset(merged_object, seurat_clusters %in% c(0, 1, 2, 3, 4, 6)) #both
+NK_and_ILC1 <- NormalizeData(NK_and_ILC1)
+NK_and_ILC1 <- FindVariableFeatures(NK_and_ILC1)
+NK_and_ILC1 <- ScaleData(NK_and_ILC1, features = rownames(NK_and_ILC1))
+NK_and_ILC1 <- RunPCA(NK_and_ILC1)
+NK_and_ILC1 <- FindNeighbors(NK_and_ILC1, dims = 1:20)
+NK_and_ILC1 <- FindClusters(NK_and_ILC1, resolution = 0.5, cluster.name = "NK_ILC1_clusters")  # try a few
+NK_and_ILC1 <- RunUMAP(NK_and_ILC1, dims = 1:20)
+DimPlot(NK_and_ILC1, reduction = "umap", group.by = "NK_ILC1_clusters")
+
+# other
+NK <- subset(merged_object, seurat_clusters %in% c(0, 1, 2, 3, 6)) #only NK
+
+ILC1 <- subset(merged_object, seurat_clusters %in% c(4)) #only ILC1
 ```
 
-## Finding markers for the respective subsets
+# Assigning m95/96 organoids
+## m95 -> 4 mutations (Apc, Kras, P53, Smad4)
+## m96 -> 3 mutations (Apc, Kras, P53)
 
-``` {r markers, echo = TRUE}
-#Finding markers for NK subset (upregulated)
-NK_markers <- FindAllMarkers(NK_cells_maybe, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-head(NK_markers)
+```{r organoids, echo=TRUE} 
+# organoids
+NK_and_ILC1$organoid <- ifelse(
+  grepl("^s[1-4]_", colnames(NK_and_ILC1)), "m95", 
+  ifelse(grepl("^s[6-8]_", colnames(NK_and_ILC1)), "m96", NA)
+)
 
-#Finding markers for ILC subset (upregulated)
-ILC1_markers <- FindMarkers(merged_object, ident.1 = 4, ident.2 = c(0, 1, 2, 3, 6), min.pct = 0.25, logfc.threshold = 0.25)
-head(ILC1_markers)
+simple_shared <- table(NK_and_ILC1$organoid)
+simple_shared
+
+Idents(NK_and_ILC1) <- "organoid" 
+
+# VISUALIZATION
+DimPlot(NK_and_ILC1, reduction = "umap", split.by = "organoid", group.by = "NK_ILC1_clusters") + ggtitle("NK and ILC1 Clusters Split by Organoid")
+
+shared_table <- table(NK_and_ILC1$NK_ILC1_clusters, NK_and_ILC1$organoid)
+shared_table
+m95_col <- shared_table[,"m95"] 
+m96_col <- shared_table[,"m96"] 
+
+m_95 <- data.frame(m95_col)
+m95 <- rownames(m_95)
+ggplot(m_95, aes(x="", y=m_95[,1], fill = m95)) + geom_bar(stat = "identity", width = 1, color = "white") + coord_polar("y", start = 0) + theme_void() 
+
+m_96 <- data.frame(m96_col)
+m96 <- rownames(m_96)
+ggplot(m_96, aes(x="", y=m_96[,1], fill = m96)) + geom_bar(stat = "identity", width = 1, color = "white") + coord_polar("y", start = 0) + theme_void() 
+
+counts_df <- melt(shared_table, varnames = c("Cluster", "Organoid"), value.name = "Count")
+
+ggplot(counts_df, aes(x = as.factor(Cluster), y = Count, fill = Organoid)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Cell Count per Cluster in Each Organoid",
+       x = "Cluster",
+       y = "Cell Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# STATISTICAL SIGNIFICANCE
+# tests cluster count identity differences between samples  (not normalized)
+chisq.test(shared_table)  
+
+# for small sample sizes:
+fisher.test(shared_table, simulate.p.value = TRUE, B = 10000)
+
+## SMALL P VALUES; INDICATE CLUSTER DISTRIBUTIONS DIFFER SIGNIFICANTLY BETWEEN M95/M96.
+
+# tests whether proportion of cells in each cluster differs significantly between orgs
+# each cluster individually using proportion test
+for (i in 1:nrow(shared_table)) {
+  cat("Cluster", rownames(shared_table)[i], "\n")
+  print(prop.test(shared_table[i,], colSums(shared_table)))
+}
+# 0 -> < 0.05, but rlly close; likely more represented in m95
+# 1 -> < 0.05, also likely more represented in m95
+# 2 -> insignificant
+# 3 -> < 0.05, also rlly close; significantly over-represented in m95
+# 4 -> < 0.05, significantly over-represented in m96
+# 5 -> insignificant
+
+# per sample (not per organoid) comparison; avoids pseudoreplication
+cluster_props <- NK_and_ILC1@meta.data %>%
+  group_by(orig.ident, NK_ILC1_clusters) %>%
+  summarise(count = n()) %>%
+  group_by(orig.ident) %>%
+  mutate(prop = count / sum(count))
+cluster_props
+
+# VISUALIZATION
+cluster_props$organoid <- case_when(
+  cluster_props$orig.ident %in% c("Sample_1", "Sample_2", "Sample_3", "Sample_4") ~ "m95",
+  cluster_props$orig.ident %in% c("Sample_6", "Sample_7", "Sample_8") ~ "m96",
+  TRUE ~ NA_character_
+)
+
+# Boxplot of proportions
+ggplot(cluster_props, aes(x = NK_ILC1_clusters, y = prop, fill = organoid)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.7) +
+  labs(title = "Cluster Proportions per Sample by Organoid",
+       x = "Cluster",
+       y = "Proportion") +
+  theme_minimal()
+
+heat_df <- dcast(cluster_props, orig.ident + organoid ~ NK_ILC1_clusters, value.var = "prop")
+
+heat_df[is.na(heat_df)] <- 0 # replace na w 0
+rownames(heat_df) <- heat_df$orig.ident
+heat_data <- as.matrix(heat_df[, -(1:2)])  # remove sample and org columns
+
+# annotation with matching rownames
+annotation_row <- data.frame(Organoid = heat_df$organoid)
+rownames(annotation_row) <- heat_df$orig.ident  # must match rownames of heat_data
+
+pheatmap::pheatmap(heat_data, 
+                   cluster_rows = TRUE, 
+                   cluster_cols = TRUE,
+                   annotation_row = annotation_row,
+                   main = "Cluster Proportion Heatmap")
+
+# normalized cluster props
+prop_df <- as.data.frame(prop.table(shared_table, margin = 2))  # column-normalized
+colnames(prop_df) <- c("Cluster", "Organoid", "Proportion")
+
+ggplot(prop_df, aes(x = Cluster, y = Proportion, fill = Organoid)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Normalized Cluster Proportions by Organoid",
+       y = "Proportion", x = "Cluster") +
+  theme_minimal()
+
+# For comparison between organoids (DE) use merged object with organoidid as metadata col (merged_object$organoid) -> allows comparisons while correcting sample effects
 ```
 
-## Gene Ontology Enrichment 
+# Maturation/Exhaustion
 
-``` {r go, echo = TRUE}
-#Extracting gene names
-NK_gene_list <- rownames(NK_markers[NK_markers$p_val_adj < 0.05 & NK_markers$avg_log2FC > 0.5, ])
-ILC1_gene_list <- rownames(ILC1_markers[ILC1_markers$p_val_adj < 0.05 & ILC1_markers$avg_log2FC > 0.5, ])
+```{r DEA, echo = TRUE}
+# general subset markers wrt other cells; add organoid; fc <= 0.2; DESeq2
+NK_and_ILC1_markers <- FindAllMarkers(NK_and_ILC1, min.pct = 0.25, logfc.threshold = 0.2, group.by = "NK_ILC1_clusters")
+head(NK_and_ILC1_markers)
 
-#GO Enrichment
-NK_GO <- enrichGO(gene = NK_gene_list, OrgDb = org.Mm.eg.db, keyType = "SYMBOL", ont = "BP", pAdjustMethod = "BH", pvalueCutoff = 0.05, readable = TRUE)
-ILC1_GO <- enrichGO(gene = ILC1_gene_list, OrgDb = org.Mm.eg.db, keyType = "SYMBOL", ont = "BP", pAdjustMethod = "BH", pvalueCutoff = 0.05, readable = TRUE)
+# sub
+NK_and_ILC1_markers %>%
+    group_by(cluster) %>%
+    dplyr::filter(avg_log2FC > 0.2) %>%
+    slice_head(n = 10) %>%
+    ungroup() -> top10pos
 
-#Plots
-dotplot(NK_GO, showCategory = 15, title = "NK Cell GO Enrichment")
-dotplot(ILC1_GO, showCategory = 15, title = "ILC1 GO Enrichment")
+NK_and_ILC1_markers %>%
+    group_by(cluster) %>%
+    dplyr::filter(avg_log2FC < -0.2) %>%
+    slice_head(n = 10) %>%
+    ungroup() -> top10neg
+
+DoHeatmap(NK_and_ILC1, features = top10pos$gene, group.by = "NK_ILC1_clusters")
+DoHeatmap(NK_and_ILC1, features = top10neg$gene, group.by = "NK_ILC1_clusters")
+
+# maturation
+maturation_genes <- c("Itgam", "Klrg1", "Cd27") 
+FeaturePlot(NK_and_ILC1, features = maturation_genes, min.cutoff = 'q10', reduction = "umap", split.by = "organoid")
+VlnPlot(NK_and_ILC1, features = maturation_genes, group.by = "NK_ILC1_clusters", split.by = "organoid", pt.size = 0, cols = c("lightblue", "pink")) 
+DotPlot(NK_and_ILC1, features = maturation_genes, group.by = "NK_ILC1_clusters", split.by = "organoid", cols = c("lightblue", "pink")) + RotatedAxis()
+RidgePlot(NK_and_ILC1, features = maturation_genes, ncol = 3, group.by = "NK_ILC1_clusters") 
+DoHeatmap(NK_and_ILC1, features = maturation_genes, size = 3) 
+FeatureScatter(NK_and_ILC1, feature1 = "Klrg1", feature2 = "Cd27")
+FeatureScatter(NK_and_ILC1, feature1 = "Itgam", feature2 = "Cd27")
+
+# exhaustion
+exhaustion_genes1 <- c("Tcf7", "Pdcd1", "Tox", "Tigit", "Havcr2", "Slamf6", "Cxcr5", "Nfatc1", "Nfatc2") 
+exhaustion_genes2 <- c("Nfatc3", "Nfatc4", "Nfat5", "Nr4a1", "Nr4a2", "Nr4a3", "Lag3", "Ctla4", "Prdm1")  
+exhaustion_genes <- c("Tcf7", "Pdcd1", "Tox", "Tigit", "Havcr2", "Slamf6", "Cxcr5", "Nfatc1", "Nfatc2", "Nfatc3", "Nfat5", "Nr4a1", "Nr4a2", "Nr4a3", "Lag3", "Ctla4", "Prdm1")
+
+FeaturePlot(NK_and_ILC1, features = exhaustion_genes1, min.cutoff = 'q10', reduction = "umap", split.by = "NK_ILC1_clusters")
+VlnPlot(NK_and_ILC1, features = exhaustion_genes1, group.by = "NK_ILC1_clusters", pt.size = 0)
+FeaturePlot(NK_and_ILC1, features = exhaustion_genes2, min.cutoff = 'q10', reduction = "umap", split.by = "NK_ILC1_clusters")
+VlnPlot(NK_and_ILC1, features = exhaustion_genes2, group.by = "NK_ILC1_clusters", pt.size = 0)
+
+DotPlot(NK_and_ILC1, features = exhaustion_genes1, group.by = "NK_ILC1_clusters", split.by = "organoid", cols = c("lightblue", "pink")) + RotatedAxis()
+
+DotPlot(NK_and_ILC1, features = exhaustion_genes2, group.by = "NK_ILC1_clusters", split.by = "organoid", cols = c("lightblue", "pink")) + RotatedAxis()
+
+NK_and_ILC1 <- AddModuleScore(
+  NK_and_ILC1,
+  exhaustion_genes,
+  pool = NULL,
+  nbin = 24,
+  ctrl = 100,
+  k = FALSE,
+  assay = NULL,
+  name = "Exhaustion_sig",
+  seed = 1,
+  search = FALSE,
+  slot = "data"
+)
+VlnPlot(NK_and_ILC1, features = "Exhaustion_sig1", split.by = "organoid", group.by = "NK_ILC1_clusters")
 ```
 
-## Comparing Clusters (returned null)
+# Cytokines, markers (from literature), DE between organoids (general)
 
-``` {r compare, echo = TRUE}
-#Comparing
-compareClusterResult <- compareCluster(
-  geneClusters = list(NK = NK_gene_list, ILC1 = ILC1_gene_list),
-  fun = "enrichGO",
-  OrgDb = org.Mm.eg.db,
-  ont = "BP",
-  pAdjustMethod = "BH",
-  pvalueCutoff = 0.05
-)
+```{r cytokines, echo = TRUE}
+cytokine_ligands <- c("Ifng", "Tnf", "Il2", "Il10", "Il12a", "Il18", "Il1b", "Il15")
+cytokine_receptors <- c("Il2rb", "Il2rg", "Il10ra", "Il10rb", "Il12rb1", "Il12rb2", "Il18r1", "Il1r1", "Il15ra", "Klrd1", "Ncr1", "Klrc2", "Klrb1c", "Klre1", "Klra7")
+
+DotPlot(NK_and_ILC1, features = cytokine_ligands, group.by = "NK_ILC1_clusters", split.by = "organoid") + RotatedAxis()
+DotPlot(NK_and_ILC1, features = cytokine_receptors, group.by = "NK_ILC1_clusters", split.by = "organoid") + RotatedAxis()
+
+#ILC1 markers -> Tbx21, Ifng, Il7r, Cxcr6, Gzma, Cxcr3, Cd49a, Cd69, Il2ra, Tnfsf10 (TRAIL), Cd73
+# NK markers -> Eomes, Nkg7, Gzmb, Prf1, Klrb1c, Klrc1
+marker_genes <- c("Tbx21", "Ifng", "Eomes", "Nkg7", "Gzmb", "Klrb1c", "Prf1", "Gzma", "Il7r", "Cxcr6", "Cxcr3", "Cd49a", "Cd69", "Il2ra", "Tnfsf10", "Ctsw", "Txk", "Cd7")
+DotPlot(NK_and_ILC1, features = marker_genes, group.by = "NK_ILC1_clusters", split.by = "organoid") + RotatedAxis()
+
+#DEGs by organoids
+Idents(NK_and_ILC1) <- "organoid"
+organoid_DEGs <- FindMarkers(NK_and_ILC1, ident.1 = "m95", ident.2 = "m96", logfc.threshold = 0.2, min.pct = 0.25) 
+head(organoid_DEGs[order(organoid_DEGs$p_val_adj), ])
+
+organoid_DEGs %>%
+  filter(p_val_adj < 0.05 & abs(avg_log2FC) > 0.2) %>%
+  arrange(desc(abs(avg_log2FC))) %>%
+  head(20)
+
+top_deg <- rownames(organoid_DEGs %>% top_n(10, wt = abs(avg_log2FC)))
+DoHeatmap(NK_and_ILC1, features = top_deg, group.by = "organoid") + ggtitle("Top DEGs between m95 and m96")
+
+symbols <- symbols[match(rownames(organoid_DEGs), names(symbols))]
+rownames(organoid_DEGs) <- symbols
+keep <- !is.na(rownames(organoid_DEGs))
+organoid_DEGs <- organoid_DEGs[keep,]
+
+EnhancedVolcano(organoid_DEGs,
+    lab = rownames(organoid_DEGs),
+    x = 'avg_log2FC',
+    y = 'p_val_adj',
+    title = 'm95 vs m96',
+    pCutoff = 0.05,
+    FCcutoff = 0.2)
+
 ```
 
-## GSEA -> represents the enrichment score of a gene set (e.g. a biological pathway) across a ranked list of genes and helps identify whether a particular set of genes is upregulated or downregulated in a comparison (e.g., NK vs. ILC1 cells).
+## DEGs between organoids for each cluster
 
-``` {r gsea, echo = TRUE}
-#Markers for NK vs ILC1
-NK_vs_ILC1_DEGs <- FindMarkers(
-  merged_object, 
-  ident.1 = c(0, 1, 2, 3, 6), # NK cells
-  ident.2 = 4,                # ILC1 cells
-  min.pct = 0.1,              # threshold of expression in either group
-  logfc.threshold = 0         
-)
+``` {r degs, echo = TRUE}
 
-#Ranked gene list based on logFC
-ranked_genes <- NK_vs_ILC1_DEGs$avg_log2FC
-names(ranked_genes) <- rownames(NK_vs_ILC1_DEGs)
+Idents(NK_and_ILC1) <- "NK_ILC1_clusters"
+de_results_list <- list()
 
-#Sort genes in decreasing order for GSEA
-ranked_genes <- sort(ranked_genes, decreasing = TRUE)
+for (cluster_id in 0:5) {
+  message(paste("Processing cluster", cluster_id))
 
-#GSEA (to see the pathways enriched in both)
-GSEA_result <- gseGO(
-  geneList = ranked_genes, 
-  OrgDb = org.Mm.eg.db, 
-  keyType = "SYMBOL",
-  ont = "BP",
-  pAdjustMethod = "BH",
-  pvalueCutoff = 0.05
-)
+  cluster_cells <- subset(NK_and_ILC1, idents = as.character(cluster_id))
+  cluster_cells$organoid <- factor(cluster_cells$organoid)
+  Idents(cluster_cells) <- "organoid"
 
-# Dotplot of the enriched pathways
-dotplot(GSEA_result, showCategory = 20) + ggtitle("GSEA - NK vs ILC1")
+  de_res <- FindMarkers(
+    cluster_cells,
+    ident.1 = "m95",
+    ident.2 = "m96",
+    test.use = "DESeq2",
+    logfc.threshold = 0.2
+  )
 
-# Top 5
-ordered_gsea <- GSEA_result@result[order(GSEA_result@result$p.adjust), ]
-top5 <- head(ordered_gsea, 5)
-top5_geneSetID <- match(top5$ID, GSEA_result@result$ID)
-gseaplot2(GSEA_result, geneSetID = top5_geneSetID, title = "Top 5 Enriched Pathways")
-```
+  de_results_list[[paste0("cluster", cluster_id)]] <- de_res
 
-## NK KEGG enrichment -> to focus on cytokine related pathways. Also provides some indirect insight into pathways where cytokine receptors play a role.
+  top_genes <- rownames(de_res)[1:10]
 
-``` {r nk kegg, echo = TRUE}
-#Gene symbols to ENTREZ IDs
-NK_gene_IDs <- mapIds(
-  org.Mm.eg.db, 
-  keys = NK_gene_list, 
-  column = "ENTREZID", 
-  keytype = "SYMBOL", 
-  multiVals = "first"
-)
+  print(
+    VlnPlot(cluster_cells, features = top_genes, split.by = "organoid", pt.size = 0) +
+    ggtitle(paste("Cluster", cluster_id, "- Top DE Genes"))
+  )
 
-#Remove NA values (genes without an ENTREZ ID)
-NK_gene_IDs <- NK_gene_IDs[!is.na(NK_gene_IDs)]
+  print(
+    DoHeatmap(cluster_cells, features = top_genes, group.by = "organoid") +
+    ggtitle(paste("Cluster", cluster_id, "- Top DE Genes Heatmap"))
+  )
 
-NK_KEGG <- enrichKEGG(
-  gene = NK_gene_IDs,
-  organism = "mmu",  #Mouse KEGG db
-  pAdjustMethod = "BH",
-  pvalueCutoff = 0.05
-)
-
-dotplot(NK_KEGG, showCategory = 10, title = "NK Cell Kegg Cytokine Pathways")
-
-#Extract cytokine specific pathways
-NK_cytokine_pathways <- NK_KEGG@result[
-  grep("cytokine|TNF|JAK|STAT|interferon|TGF", NK_KEGG@result$Description, ignore.case = TRUE), ]
-
-head(NK_cytokine_pathways$Description, 50)
-```
-
-## ILC1 KEGG enrichment
-
-``` {r ilc1 kegg, echo = TRUE}
-ILC1_gene_IDs <- mapIds(
-  org.Mm.eg.db, 
-  keys = ILC1_gene_list, 
-  column = "ENTREZID", 
-  keytype = "SYMBOL", 
-  multiVals = "first"
-)
-
-ILC1_gene_IDs <- ILC1_gene_IDs[!is.na(ILC1_gene_IDs)]
-
-
-ILC1_KEGG <- enrichKEGG(
-  gene = ILC1_gene_IDs,
-  organism = "mmu",
-  pAdjustMethod = "BH",
-  pvalueCutoff = 0.05
-)
-
-dotplot(ILC1_KEGG, showCategory = 10, title = "ILC1 Cell Kegg Cytokine Pathways")
-
-ILC1_cytokine_pathways <- ILC1_KEGG@result[
-  grep("cytokine|TNF|JAK|STAT|interferon|TGF", ILC1_KEGG@result$Description, ignore.case = TRUE), ]
-
-head(ILC1_cytokine_pathways$Description, 50)
-```
-
-# Exhausted vs Mature NK subsets. Version 1: very restrictive, poor classification and scope
-## Exhausted NK Cells: Low Itgam, Cd27, Gzmb, Gzma, Prf1, High Klrg1
-## Mature NK Cells: High Itgam, Cd27, Gzmb, Gzma, Prf1, Low Klrg1
-
-``` {r mature vs exhausted, echo = TRUE}
-# Visualization
-VlnPlot(NK_cells_maybe, features = c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1"), group.by = "seurat_clusters")
-
-# More extensive for visualizing, but too strict for subsetting :(
-FeaturePlot(NK_cells_maybe, features = c(
-  "Lamp1", "Prf1", "Gzmb", "Gzma", "Eomes", "Tbx21", "Klrg1", "Tnf", "Ifng", 
-  "Klrd1", "Klrc2", "Itgam", "Cd27", "Gzmb", "Prf1" 
-), min.cutoff = 'q10', reduction = "umap")
-
-VlnPlot(NK_cells_maybe, features = c(
-  "Lamp1", "Prf1", "Gzmb", "Gzma", "Eomes", "Tbx21", "Klrg1", "Tnf", "Ifng", 
-  "Klrd1", "Klrc2", "Itgam", "Cd27", "Gzmb", "Prf1" 
-), group.by = "seurat_clusters")
-
-# Define new marker lists
-subset_markers <- c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1")
-
-# Ensure only existing markers are used
-valid_markers <- subset_markers[subset_markers %in% rownames(NK_cells_maybe@assays$RNA@features)]
-valid_markers
-
-# Fetch expression data for valid markers
-expr_data <- FetchData(NK_cells_maybe, vars = valid_markers)
-
-# See distribution
-summary(expr_data)
-
-# Define dynamic quantile cutoffs (less restrictive)
-low_threshold <- apply(expr_data, 2, function(x) quantile(x[x > 0], 0.33, na.rm = TRUE))  # Lower 40% (excluding zeros)
-high_threshold <- apply(expr_data, 2, function(x) quantile(x[x > 0], 0.66, na.rm = TRUE)) # Upper 60% (excluding zeros)
-
-# Use mean for Klrg1 as a cutoff (since median is 0)
-klrg1_cutoff <- mean(expr_data$Klrg1[expr_data$Klrg1 > 0])
-
-
-# Identify exhausted NK cells (Low: Itgam, Gzmb, Gzma, Prf1; High: Klrg1)
-exhausted_cells <- rownames(expr_data)[
-  expr_data$Itgam < low_threshold["Itgam"] & 
-  expr_data$Gzmb < low_threshold["Gzmb"] & 
-  expr_data$Prf1 < low_threshold["Prf1"] & 
-  expr_data$Klrg1 > klrg1_cutoff  # Klrg1 presence is enough
-]
-
-# Identify mature NK cells (High: Itgam, Gzmb, Gzma, Prf1; Low: Klrg1)
-mature_cells <- rownames(expr_data)[
-  expr_data$Itgam > high_threshold["Itgam"] & 
-  expr_data$Gzmb > high_threshold["Gzmb"] & 
-  expr_data$Prf1 > high_threshold["Prf1"] & 
-  expr_data$Klrg1 < klrg1_cutoff  # Klrg1 absence is enough
-]
-
-# Subset exhausted NK cells
-if (length(exhausted_cells) > 0) {
-  exhausted_NK_1 <- subset(NK_cells_maybe, cells = exhausted_cells)
-  print(paste("Subset successful: Retained", length(exhausted_cells), "exhausted NK cells."))
-} else {
-  print("No exhausted NK cells found. Try adjusting the quantile cutoffs.")
+  print(
+    EnhancedVolcano(
+      de_res,
+      lab = rownames(de_res),
+      x = "avg_log2FC",
+      y = "p_val", # if using adjusted, nothing significant is shown (except c4)
+      pCutoff = 0.05,
+      FCcutoff = 0.2,
+      title = paste("Volcano Plot - Cluster", cluster_id),
+      subtitle = "DESeq2: m95 vs m96",
+      pointSize = 2.5,
+      labSize = 3.5
+    )
+  )
+  
+  print(
+  DotPlot(cluster_cells, features = top_genes, 
+          group.by = "NK_ILC1_clusters", split.by = "organoid") +
+    RotatedAxis() +
+    ggtitle(paste("DotPlot - Top DEGs in Cluster", cluster_id))
+  )
 }
 
-# Subset mature NK cells
-if (length(mature_cells) > 0) {
-  mature_NK_1 <- subset(NK_cells_maybe, cells = mature_cells)
-  print(paste("Subset successful: Retained", length(mature_cells), "mature NK cells."))
-} else {
-  print("No mature NK cells found. Try adjusting the quantile cutoffs.")
-}
 ```
 
-# Clustering method for NK subset characterization.
-## May be better, but also some weird behaviour. The terminally mature cells (aka expressing high Klrg1) seem to still retain high cytotoxic activity. 
+## GSEA (for DEGs across organoids for each cluster); nothing comes up except for 1 pathway in c5
 
-``` {r mature_vs_exhausted, echo = TRUE} 
-selected_genes <- c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1", "Ifng", "Pdcd1") #added PD-1
+``` {r degs_gsea, echo = TRUE}
+library(clusterProfiler)
+library(org.Mm.eg.db)
+organism <- org.Mm.eg.db
 
-expr_matrix <- FetchData(NK_cells_maybe, vars = selected_genes)
+gsea_results_list <- list()
 
-# Normalize expression (Z-score transformation)
-expr_matrix_scaled <- scale(expr_matrix)
-
-# PCA on scaled expression data
-pca_result <- prcomp(expr_matrix_scaled, center = TRUE, scale. = TRUE)
-
-# K-nearest neighbor clustering
-set.seed(123)
-clustering <- pam(pca_result$x[, 1:5], k = 2)  # Use first 5 principal components
-
-# Assign clusters
-expr_matrix$Cluster <- as.factor(clustering$clustering)
-
-# Check avg expression per cluster
-avg_expr <- aggregate(expr_matrix[, selected_genes], by = list(expr_matrix$Cluster), FUN = mean)
-print(avg_expr)
-
-# new logic for using all markers
-score_exhaustion <- function(vec) {
-  vec["Klrg1"] + vec["Pdcd1"] - (vec["Cd27"] + vec["Itgam"] + vec["Gzmb"] + vec["Prf1"] + vec["Ifng"])
+for (cluster_name in names(de_results_list)) {
+  message(paste("Running GSEA for", cluster_name))
+  
+  de_res <- de_results_list[[cluster_name]]
+  
+  ranked_genes <- de_res$avg_log2FC
+  names(ranked_genes) <- rownames(de_res)
+  ranked_genes <- sort(ranked_genes, decreasing = TRUE)
+  
+  gsea_res <- tryCatch({
+    gseGO(
+      geneList = ranked_genes,
+      OrgDb = organism,
+      keyType = "SYMBOL",
+      ont = "ALL",
+      pAdjustMethod = "BH",
+      pvalueCutoff = 0.05,
+      verbose = FALSE
+    )
+  }, error = function(e) {
+    message(paste("No enrichments for", cluster_name, "- skipping."))
+    return(NULL)
+  })
+  
+  if (!is.null(gsea_res) && nrow(gsea_res@result) > 0) {
+    gsea_results_list[[cluster_name]] <- gsea_res
+    
+    print(dotplot(gsea_res, showCategory = 20) + ggtitle(paste("GSEA -", cluster_name)))
+    
+    top5 <- head(gsea_res@result[order(gsea_res@result$p.adjust), ], 5)
+    top5_ids <- match(top5$ID, gsea_res@result$ID)
+    print(gseaplot2(gsea_res, geneSetID = top5_ids, title = paste("Top 5 Pathways -", cluster_name)))
+  } else {
+    message(paste("No significant pathways found for", cluster_name))
+  }
 }
-
-exhaustion_scores <- apply(avg_expr[, selected_genes], 1, score_exhaustion)
-exhausted_cluster <- as.numeric(avg_expr$Group.1[which.max(exhaustion_scores)])
-expr_matrix$Cluster <- as.factor(clustering$clustering)
-
-exhausted_cells <- rownames(expr_matrix)[expr_matrix$Cluster == exhausted_cluster]
-mature_cells <- rownames(expr_matrix)[expr_matrix$Cluster != exhausted_cluster]
-
-# Subset exhausted NKs
-if (length(exhausted_cells) > 0) {
-  exhausted_NK <- subset(NK_cells_maybe, cells = exhausted_cells)
-  print(paste("Subset successful: Retained", length(exhausted_cells), "exhausted NK cells."))
-} else {
-  print("No exhausted NK cells found. Try adjusting the clustering approach.")
-}
-
-# Subset mature NKs
-if (length(mature_cells) > 0) {
-  mature_NK <- subset(NK_cells_maybe, cells = mature_cells)
-  print(paste("Subset successful: Retained", length(mature_cells), "mature NK cells."))
-} else {
-  print("No mature NK cells found. Try adjusting the clustering approach.")
-}
-
-NK_cells_maybe$ME_Clustering <- expr_matrix$Cluster
-
-DimPlot(NK_cells_maybe, group.by = "ME_Clustering", reduction = "umap", label = TRUE)
-FeaturePlot(NK_cells_maybe, features = c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1", "Ifng", "Pdcd1"), reduction = "umap")
-
-#"Lamp1", "Prf1", "Gzmb", "Eomes", "Tbx21", "Klrg1", "Tnf", "Ifng", "Itgam", "Cd27", "Prf1"
-FeaturePlot(exhausted_NK, features = c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1", "Ifng", "Pdcd1"), reduction = "umap")
-FeaturePlot(mature_NK, features = c("Itgam", "Klrg1", "Cd27", "Gzmb", "Prf1", "Ifng", "Pdcd1"), reduction = "umap")
-
-# DE markers in exhausted
-exhausted_vs_mature <- FindMarkers(NK_cells_maybe, ident.1 = exhausted_cells, ident.2 = mature_cells)
-head(exhausted_vs_mature) 
-
-exhausted_genes <- rownames(exhausted_vs_mature[exhausted_vs_mature$p_val_adj < 0.05 & exhausted_vs_mature$avg_log2FC > 1, ])
-
-# Map Ids
-exhausted_genes_entrez <- mapIds(
-  org.Mm.eg.db,
-  keys = exhausted_genes,
-  column = "ENTREZID",
-  keytype = "SYMBOL",
-  multiVals = "first"
-)
-
-exhausted_genes_entrez <- na.omit(exhausted_genes_entrez)
-
-enriched_pathways <- enrichKEGG(gene = exhausted_genes_entrez, organism = "mmu")
-dotplot(enriched_pathways)
 ```
