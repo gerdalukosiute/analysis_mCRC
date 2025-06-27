@@ -32,6 +32,10 @@ library(ggrepel)
 library(enrichplot)
 library(EnhancedVolcano)
 library(DESeq2) 
+library(readxl)
+library(patchwork)
+library(tidyr)
+library(Matrix)
 ```
 
 ## Initially I exclude sample 5, since it has insufficient data to contribute to the analysis efficiently. I will try to subsequently save it in a later chunck.
@@ -74,7 +78,6 @@ seurat_s8 <- CreateSeuratObject(counts = mtx_sample8, project = "Sample_8", min.
 ``` {r sample 1, echo = TRUE}
 #Quality control
 seurat_s1[["percent.mt"]] <- PercentageFeatureSet(seurat_s1, pattern = "^mt-") 
-#View(seurat_s1@meta.data)
 
 VlnPlot(seurat_s1, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 
@@ -97,7 +100,7 @@ top10 <- head(VariableFeatures(s1_integrated), 10)
 top10
 plot1 <- VariableFeaturePlot(s1_integrated)
 plot1
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) #labeled(extra swag)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) 
 plot2
 
 #Scaling
@@ -113,7 +116,7 @@ ElbowPlot(s1_reduced)
 #Clustering
 s1_neighboors <- FindNeighbors(object = s1_reduced, dims = 1:20)
 s1_clusters <- FindClusters(object = s1_neighboors)
-head(Idents(s1_clusters), 5) #cluster IDs 1st 5 cells
+head(Idents(s1_clusters), 5) 
 
 #UMAP
 s1_umap <- RunUMAP(object = s1_clusters, dims = 1:20)
@@ -136,7 +139,7 @@ annotations <- s1_umap@meta.data$seurat_clusters
 homotypic.prop <- modelHomotypic(annotations)
 nExp_poi <- round(0.05*nrow(s1_umap@meta.data)) ##in project description
 nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-nExp_poi.adj #expected number of doublets
+nExp_poi.adj 
 
 #DoubletFinder
 s1_finalized <- doubletFinder(s1_umap,
@@ -157,7 +160,6 @@ DimPlot(s1_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.
 ``` {r sample 2, echo = TRUE}
 #Quality control
 seurat_s2[["percent.mt"]] <- PercentageFeatureSet(seurat_s2, pattern = "^mt-") 
-#View(seurat_s2@meta.data)
 
 VlnPlot(seurat_s2, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 
@@ -180,7 +182,7 @@ top10 <- head(VariableFeatures(s2_integrated), 10)
 top10
 plot1 <- VariableFeaturePlot(s2_integrated)
 plot1
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) #labeled(extra swag)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) 
 plot2
 
 #Scaling
@@ -196,7 +198,7 @@ ElbowPlot(s2_reduced)
 #Clustering
 s2_neighboors <- FindNeighbors(object = s2_reduced, dims = 1:20)
 s2_clusters <- FindClusters(object = s2_neighboors)
-head(Idents(s2_clusters), 5) #cluster IDs 1st 5 cells
+head(Idents(s2_clusters), 5) 
 
 #UMAP
 s2_umap <- RunUMAP(object = s2_clusters, dims = 1:20)
@@ -219,7 +221,7 @@ annotations <- s2_umap@meta.data$seurat_clusters
 homotypic.prop <- modelHomotypic(annotations)
 nExp_poi <- round(0.05*nrow(s2_umap@meta.data)) ##in project description
 nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-nExp_poi.adj #expected number of doublets
+nExp_poi.adj
 
 #DoubletFinder
 s2_finalized <- doubletFinder(s2_umap,
@@ -240,7 +242,6 @@ DimPlot(s2_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.
 ``` {r sample 3, echo = TRUE} 
 #Quality control
 seurat_s3[["percent.mt"]] <- PercentageFeatureSet(seurat_s3, pattern = "^mt-") 
-#View(seurat_s3@meta.data)
 
 VlnPlot(seurat_s3, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 
@@ -263,7 +264,7 @@ top10 <- head(VariableFeatures(s3_integrated), 10)
 top10
 plot1 <- VariableFeaturePlot(s3_integrated)
 plot1
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) #labeled(extra swag)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) 
 plot2
 
 #Scaling
@@ -300,9 +301,9 @@ pK
 #Homotypic doublet proportion estimate
 annotations <- s3_umap@meta.data$seurat_clusters
 homotypic.prop <- modelHomotypic(annotations)
-nExp_poi <- round(0.05*nrow(s3_umap@meta.data)) ##in project description
+nExp_poi <- round(0.05*nrow(s3_umap@meta.data))
 nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-nExp_poi.adj #expected number of doublets
+nExp_poi.adj 
 
 #DoubletFinder
 s3_finalized <- doubletFinder(s3_umap,
@@ -323,7 +324,6 @@ DimPlot(s3_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.
 ``` {r sample 4, echo = TRUE}
 #Quality control
 seurat_s4[["percent.mt"]] <- PercentageFeatureSet(seurat_s4, pattern = "^mt-") 
-#View(seurat_s4@meta.data)
 
 VlnPlot(seurat_s4, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 
@@ -346,7 +346,7 @@ top10 <- head(VariableFeatures(s4_integrated), 10)
 top10
 plot1 <- VariableFeaturePlot(s4_integrated)
 plot1
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) #labeled(extra swag)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) 
 plot2
 
 #Scaling
@@ -362,7 +362,7 @@ ElbowPlot(s4_reduced)
 #Clustering
 s4_neighboors <- FindNeighbors(object = s4_reduced, dims = 1:20)
 s4_clusters <- FindClusters(object = s4_neighboors)
-head(Idents(s4_clusters), 5) #cluster IDs 1st 5 cells
+head(Idents(s4_clusters), 5) 
 
 #UMAP
 s4_umap <- RunUMAP(object = s4_clusters, dims = 1:20)
@@ -385,7 +385,7 @@ annotations <- s4_umap@meta.data$seurat_clusters
 homotypic.prop <- modelHomotypic(annotations)
 nExp_poi <- round(0.05*nrow(s4_umap@meta.data)) ##in project description
 nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-nExp_poi.adj #expected number of doublets
+nExp_poi.adj 
 
 #DoubletFinder
 s4_finalized <- doubletFinder(s4_umap,
@@ -401,12 +401,11 @@ table(s4_finalized@meta.data$DF.classifications_0.25_0.3_3)
 DimPlot(s4_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.3_3")
 ```
 
-### Sample 5 (left for later)
+### Sample 5 (excluded))
 
 ``` {r sample 5, echo = TRUE}
 #Quality control
 #seurat_s5[["percent.mt"]] <- PercentageFeatureSet(seurat_s5, pattern = "^mt-") 
-#View(seurat_s5@meta.data)
 
 #VlnPlot(seurat_s5, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 
@@ -431,59 +430,59 @@ DimPlot(s4_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.
 #top10
 #plot1 <- VariableFeaturePlot(s5_integrated)
 #plot1
-#plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) #labeled(extra swag)
-#plot2
-
-#Scaling
-#s5_scaled <- ScaleData(object = s5_integrated)
-
-#Linear dimensionality reduction
-#s5_reduced <- RunPCA(object = s5_scaled, npcs = 10) 
-#VizDimLoadings(s5_reduced, dims = 1:2, reduction = "pca")
-#DimPlot(s5_reduced, reduction = "pca") + NoLegend()
-#DimHeatmap(s5_reduced, dims = 1:10, cells = 500, balanced = TRUE)
-#ElbowPlot(s5_reduced)
-
-#Clustering
-#s5_neighboors <- FindNeighbors(object = s5_reduced, dims = 1:10)
-#s5_clusters <- FindClusters(object = s5_neighboors)
-#head(Idents(s5_clusters), 5) #cluster IDs 1st 5 cells
-
-#UMAP
-#s5_umap <- RunUMAP(object = s5_clusters, dims = 1:10, n.neighbors = 5)
-#DimPlot(s5_umap, reduction = "umap")
-
-#Doublet finder; UNAVAILABLE FOR THIS SAMPLE; RUN DOWNSTREAM ANALYSIS WITH AND WITHOUT S5 TO SEE THE EFFECT
-#pK identification (no ground-truth)
-#sweep.res.list_s5 <- paramSweep(s5_umap, PCs = 1:10, sct = FALSE) #very low cell count, gives error 
-#sweep.stats_s5 <- summarizeSweep(sweep.res.list_s5, GT = FALSE)
-#bcmvn_s5 <- find.pK(sweep.stats_s5)
-
-#ggplot(bcmvn_s5, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
-#0.3 max
-#pK <- bcmvn_s5[bcmvn_s4$BCmetric == max(bcmvn_s5$BCmetric), "pK"]
-#pK <- as.numeric(as.character(pK))
-#pK
-
-#Homotypic doublet proportion estimate
-#annotations <- s5_umap@meta.data$seurat_clusters
-#homotypic.prop <- modelHomotypic(annotations)
-#nExp_poi <- round(0.05*nrow(s5_umap@meta.data)) ##in project description
-#nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-#nExp_poi.adj #expected number of doublets
-
-#DoubletFinder
-#s5_finalized <- doubletFinder(s5_umap,
-                              #PCs = 1:20,
-                              #pK = pK,
-                              #nExp = nExp_poi.adj,
-                              #reuse.pANN = FALSE, sct = FALSE)
-#DimPlot(s5_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.3_3")
-#table(s5_finalized@meta.data$DF.classifications_0.25_0.3_3)
-
-#s5_finalized <- subset(s5_finalized, subset = DF.classifications_0.25_0.3_3 == "Singlet")
-#table(s5_finalized@meta.data$DF.classifications_0.25_0.3_3)
-#DimPlot(s5_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.3_3")
+#plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) 
+# plot2
+# 
+# #Scaling
+# s5_scaled <- ScaleData(object = s5_integrated)
+# 
+# #Linear dimensionality reduction
+# s5_reduced <- RunPCA(object = s5_scaled, npcs = 10) 
+# VizDimLoadings(s5_reduced, dims = 1:2, reduction = "pca")
+# DimPlot(s5_reduced, reduction = "pca") + NoLegend()
+# DimHeatmap(s5_reduced, dims = 1:10, cells = 500, balanced = TRUE)
+# ElbowPlot(s5_reduced)
+# 
+# #Clustering
+# s5_neighboors <- FindNeighbors(object = s5_reduced, dims = 1:10)
+# s5_clusters <- FindClusters(object = s5_neighboors)
+# head(Idents(s5_clusters), 5) 
+# 
+# #UMAP
+# s5_umap <- RunUMAP(object = s5_clusters, dims = 1:10, n.neighbors = 5)
+# DimPlot(s5_umap, reduction = "umap")
+# 
+# #Doublet finder; UNAVAILABLE FOR THIS SAMPLE; RUN DOWNSTREAM ANALYSIS WITH AND WITHOUT S5 TO SEE THE EFFECT
+# #pK identification (no ground-truth)
+# sweep.res.list_s5 <- paramSweep(s5_umap, PCs = 1:10, sct = FALSE) #very low cell count, gives error 
+# sweep.stats_s5 <- summarizeSweep(sweep.res.list_s5, GT = FALSE)
+# bcmvn_s5 <- find.pK(sweep.stats_s5)
+# 
+# ggplot(bcmvn_s5, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+# #0.3 max
+# pK <- bcmvn_s5[bcmvn_s4$BCmetric == max(bcmvn_s5$BCmetric), "pK"]
+# pK <- as.numeric(as.character(pK))
+# pK
+# 
+# #Homotypic doublet proportion estimate
+# annotations <- s5_umap@meta.data$seurat_clusters
+# homotypic.prop <- modelHomotypic(annotations)
+# nExp_poi <- round(0.05*nrow(s5_umap@meta.data)) 
+# nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+# nExp_poi.adj 
+# 
+# #DoubletFinder
+# s5_finalized <- doubletFinder(s5_umap,
+#                               PCs = 1:20,
+#                               pK = pK,
+#                               nExp = nExp_poi.adj,
+#                               reuse.pANN = FALSE, sct = FALSE)
+# DimPlot(s5_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.3_3")
+# table(s5_finalized@meta.data$DF.classifications_0.25_0.3_3)
+# 
+# s5_finalized <- subset(s5_finalized, subset = DF.classifications_0.25_0.3_3 == "Singlet")
+# table(s5_finalized@meta.data$DF.classifications_0.25_0.3_3)
+# DimPlot(s5_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.3_3")
 ```
 
 ### Sample 6
@@ -491,7 +490,6 @@ DimPlot(s4_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.
 ``` {r sample 6, echo = TRUE}
 #Quality control
 seurat_s6[["percent.mt"]] <- PercentageFeatureSet(seurat_s6, pattern = "^mt-") 
-#View(seurat_s6@meta.data)
 
 VlnPlot(seurat_s6, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 
@@ -516,7 +514,7 @@ top10 <- head(VariableFeatures(s6_integrated), 10)
 top10
 plot1 <- VariableFeaturePlot(s6_integrated)
 plot1
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) #labeled(extra swag)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) 
 plot2
 
 #Scaling
@@ -532,7 +530,7 @@ ElbowPlot(s6_reduced)
 #Clustering
 s6_neighboors <- FindNeighbors(object = s6_reduced, dims = 1:20)
 s6_clusters <- FindClusters(object = s6_neighboors)
-head(Idents(s6_clusters), 5) #cluster IDs 1st 5 cells
+head(Idents(s6_clusters), 5) 
 
 #UMAP
 s6_umap <- RunUMAP(object = s6_clusters, dims = 1:20)
@@ -555,7 +553,7 @@ annotations <- s6_umap@meta.data$seurat_clusters
 homotypic.prop <- modelHomotypic(annotations)
 nExp_poi <- round(0.05*nrow(s6_umap@meta.data)) ##in project description
 nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-nExp_poi.adj #expected number of doublets
+nExp_poi.adj 
 
 #DoubletFinder
 s6_finalized <- doubletFinder(s6_umap,
@@ -576,7 +574,6 @@ DimPlot(s6_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.
 ``` {r sample 7, echo = TRUE}
 #Quality control
 seurat_s7[["percent.mt"]] <- PercentageFeatureSet(seurat_s7, pattern = "^mt-") 
-#View(seurat_s7@meta.data)
 
 VlnPlot(seurat_s7, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 
@@ -601,7 +598,7 @@ top10 <- head(VariableFeatures(s7_integrated), 10)
 top10
 plot1 <- VariableFeaturePlot(s7_integrated)
 plot1
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) #labeled(extra swag)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) 
 plot2
 
 #Scaling
@@ -617,7 +614,7 @@ ElbowPlot(s7_reduced)
 #Clustering
 s7_neighboors <- FindNeighbors(object = s7_reduced, dims = 1:20)
 s7_clusters <- FindClusters(object = s7_neighboors)
-head(Idents(s7_clusters), 5) #cluster IDs 1st 5 cells
+head(Idents(s7_clusters), 5) 
 
 #UMAP
 s7_umap <- RunUMAP(object = s7_clusters, dims = 1:20)
@@ -640,7 +637,7 @@ annotations <- s7_umap@meta.data$seurat_clusters
 homotypic.prop <- modelHomotypic(annotations)
 nExp_poi <- round(0.05*nrow(s7_umap@meta.data)) ##in project description
 nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-nExp_poi.adj #expected number of doublets
+nExp_poi.adj 
 
 #DoubletFinder
 s7_finalized <- doubletFinder(s7_umap,
@@ -661,7 +658,6 @@ DimPlot(s7_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.
 ``` {r sample 8, echo = TRUE}
 #Quality control
 seurat_s8[["percent.mt"]] <- PercentageFeatureSet(seurat_s8, pattern = "^mt-") 
-#View(seurat_s8@meta.data)
 
 VlnPlot(seurat_s8, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 
@@ -686,7 +682,7 @@ top10 <- head(VariableFeatures(s8_integrated), 10)
 top10
 plot1 <- VariableFeaturePlot(s8_integrated)
 plot1
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) #labeled(extra swag)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) 
 plot2
 
 #Scaling
@@ -725,7 +721,7 @@ annotations <- s8_umap@meta.data$seurat_clusters
 homotypic.prop <- modelHomotypic(annotations)
 nExp_poi <- round(0.05*nrow(s8_umap@meta.data)) ##in project description
 nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
-nExp_poi.adj #expected number of doublets
+nExp_poi.adj 
 
 #DoubletFinder
 s8_finalized <- doubletFinder(s8_umap,
@@ -741,12 +737,11 @@ table(s8_finalized@meta.data$DF.classifications_0.25_0.15_24)
 DimPlot(s8_finalized, reduction = 'umap', group.by = "DF.classifications_0.25_0.15_24")
 ```
 
-## Next, I merge the samples into a single object for easier downstream analysis (skipping sample 5 for now).
+## Next, merge the samples into a single object for easier downstream analysis (skipping sample 5).
 
 ``` {r merge object, echo = TRUE}
 samples <- list(s2_finalized, s3_finalized, s4_finalized, s6_finalized, s7_finalized, s8_finalized) #skipping s5
 merged_object <- merge(s1_finalized, y = samples, add.cell.ids = c("s1", "s2", "s3", "s4", "s6", "s7", "s8"))
-#merged_object[["RNA"]] <- split(merged_object[["RNA"]], f = merged_object$orig.ident) #not necessary to include scale.data since integrating downstream it's recalculated
 ```
 
 ## Proceeding with the steps in the Seurat documentation on integration.
@@ -760,7 +755,6 @@ merged_object <- FindNeighbors(merged_object, dims = 1:20, reduction = "pca")
 merged_object <- FindClusters(merged_object, resolution = 2, cluster.name = "unintegrated_clusters")
 merged_object <- RunUMAP(merged_object, dims = 1:20, reduction = "pca", reduction.name = "umap.unintegrated")
 DimPlot(merged_object, reduction ="umap.unintegrated", group.by = c("orig.ident", "seurat_clusters"))
-#Integration -> to account for sample differences
 merged_object <- IntegrateLayers(object = merged_object, method = CCAIntegration, orig.reduction = "pca", new.reduction = "integrated.cca", verbose = FALSE)
 
 merged_object <- JoinLayers(merged_object)
@@ -768,13 +762,13 @@ head(merged_object)
 tail(merged_object)
 
 merged_object <- FindNeighbors(merged_object, reduction = "integrated.cca", dims = 1:20)
-merged_object <- FindClusters(merged_object, resolution = 0.5, cluster.name = "integrated_clusters") #keep lower; increase based on cond
+merged_object <- FindClusters(merged_object, resolution = 0.5, cluster.name = "integrated_clusters") 
 merged_object <- RunUMAP(merged_object, dims = 1:20, reduction = "integrated.cca")
 DimPlot(merged_object, reduction = "umap", group.by = c("orig.ident", "seurat_clusters")) 
 DimPlot(merged_object, reduction = "umap", split.by = "orig.ident")
 ```
 
-## This is a plot regarding the percentage of samples in each cluster.
+## Percentage of samples in each cluster.
 
 ``` {r percent per cluster, echo = TRUE}
 cell_counts <- table(merged_object$orig.ident, merged_object$integrated_clusters)
@@ -793,7 +787,6 @@ ggplot(percentages_df, aes(x = as.factor(Cluster), y = Percentage, fill = Sample
 ## Finding all markers
 
 ``` {r type annotation, echo = TRUE}
-#Finding ALL MARKERS for all clusters
 all_markers <- FindAllMarkers(merged_object, only.pos = T)
 top_markers <- all_markers %>%
   group_by(cluster) %>%
@@ -883,21 +876,73 @@ head(markers_c9)
 FeaturePlot(merged_object, features = c("Cd40", "Clec4d", "Sirpa", "Pirb", "Tgfbi", "Il1b"), min.cutoff = 'q10', reduction = "umap")
 ```
 
-# Reference based cell type annotation using cell typist (refer to the celltypist_run.py script in the repo) 
+# Cell typist annotation (refer to the celltypist_run.py script in the repo) 
 
 ``` {r annotation, echo = TRUE}
 expression_matrix <- GetAssayData(merged_object, assay = "RNA", slot = "data")
 dense_matrix <- as.matrix(expression_matrix)
 expression_df <- as.data.frame(t(dense_matrix))
 expression_df$cell_id <- rownames(expression_df)
-expression_df <- expression_df[, c(ncol(expression_df), 1:(ncol(expression_df) - 1))]
+expression_df <- expression_df[, c("cell_id", setdiff(colnames(expression_df), "cell_id"))]
 write.csv(expression_df, file = "seurat_expression.csv", row.names = FALSE, quote = FALSE)
 
 predictions <- read.csv("/Users/gerdalukosiute/Downloads/Thesis/analysis_mCRC/predicted_labels.csv")
 head(predictions)
+colnames(predictions)[1] <- "cell_id"
 rownames(predictions) <- predictions$cell_id
+predictions <- predictions[colnames(merged_object), ]  
 merged_object <- AddMetaData(merged_object, metadata = predictions$predicted_label, col.name = "celltypist_labels")
 table(merged_object@meta.data$celltypist_labels)
+
+
+DimPlot(merged_object,
+        reduction = "umap",
+        group.by = c("celltypist_labels", "seurat_clusters"),
+        label = FALSE)
+
+label_counts <- as.data.frame(table(merged_object@meta.data$celltypist_labels))
+colnames(label_counts) <- c("Cell Type", "Cell Count")
+
+# table
+ggplot(label_counts, aes(x = 1, y = reorder(`Cell Type`, -`Cell Count`))) +
+  geom_text(aes(label = paste0(`Cell Type`, ": ", `Cell Count`)), hjust = 0) +
+  theme_void() +
+  theme(
+    plot.margin = margin(1, 1, 1, 1, "cm"),
+    text = element_text(size = 12),
+    panel.grid = element_blank()
+  ) +
+  xlim(1, 1.5) 
+
+label_counts$`Cell Type` <- factor(label_counts$`Cell Type`, levels = label_counts$`Cell Type`[order(label_counts$`Cell Count`, decreasing = TRUE)])
+
+header_row <- data.frame(
+  `Cell Type` = "Cell Type",
+  `Cell Count` = "Count",
+  check.names = FALSE
+)
+
+table_data <- rbind(header_row, label_counts)
+table_data$y_pos <- rev(seq_len(nrow(table_data))) 
+
+p3 <- ggplot(table_data, aes(y = y_pos)) +
+  geom_text(aes(x = 0, label = `Cell Type`), hjust = 0, size = 4, fontface = ifelse(table_data$y_pos == max(table_data$y_pos), "bold", "plain")) +
+  geom_text(aes(x = 1, label = `Cell Count`), hjust = 1, size = 4, fontface = ifelse(table_data$y_pos == max(table_data$y_pos), "bold", "plain")) +
+  geom_segment(aes(x = -0.05, xend = 1.05, y = max(y_pos) - 0.5, yend = max(y_pos) - 0.5), size = 0.5) + # Header line
+  theme_void() +
+  theme(
+    plot.margin = margin(1, 1, 1, 1, "cm"),
+    plot.title = element_text(hjust = 0.5, face = "bold", margin = margin(b = 10)),
+    panel.grid = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  xlim(-0.1, 1.1) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) 
+
+print(p3)
+
 ```
 
 # Initial NK and ILC1 subset
@@ -905,20 +950,16 @@ table(merged_object@meta.data$celltypist_labels)
 ``` {r subset1, echo = TRUE}
 FeaturePlot(merged_object, features = c("Cd3e", "Cd3d", "Tbx21", "Eomes", "Cd8b1", "Nkg7", "Gzmb"), min.cutoff = 'q10', reduction = "umap")
 
-NK_and_ILC1 <- subset(merged_object, seurat_clusters %in% c(0, 1, 2, 3, 4, 6)) #both
+NK_and_ILC1 <- subset(merged_object, seurat_clusters %in% c(0, 1, 2, 3, 4, 6)) #both, 4717
 NK_and_ILC1 <- NormalizeData(NK_and_ILC1)
 NK_and_ILC1 <- FindVariableFeatures(NK_and_ILC1)
 NK_and_ILC1 <- ScaleData(NK_and_ILC1, features = rownames(NK_and_ILC1))
 NK_and_ILC1 <- RunPCA(NK_and_ILC1)
 NK_and_ILC1 <- FindNeighbors(NK_and_ILC1, dims = 1:20)
-NK_and_ILC1 <- FindClusters(NK_and_ILC1, resolution = 0.5, cluster.name = "NK_ILC1_clusters")  # try a few
+NK_and_ILC1 <- FindClusters(NK_and_ILC1, resolution = 0.5, cluster.name = "NK_ILC1_clusters") 
 NK_and_ILC1 <- RunUMAP(NK_and_ILC1, dims = 1:20)
 DimPlot(NK_and_ILC1, reduction = "umap", group.by = "NK_ILC1_clusters")
 
-# other
-NK <- subset(merged_object, seurat_clusters %in% c(0, 1, 2, 3, 6)) #only NK
-
-ILC1 <- subset(merged_object, seurat_clusters %in% c(4)) #only ILC1
 ```
 
 # Assigning m95/96 organoids
@@ -937,7 +978,6 @@ simple_shared
 
 Idents(NK_and_ILC1) <- "organoid" 
 
-# VISUALIZATION
 DimPlot(NK_and_ILC1, reduction = "umap", split.by = "organoid", group.by = "NK_ILC1_clusters") + ggtitle("NK and ILC1 Clusters Split by Organoid")
 
 shared_table <- table(NK_and_ILC1$NK_ILC1_clusters, NK_and_ILC1$organoid)
@@ -964,15 +1004,12 @@ ggplot(counts_df, aes(x = as.factor(Cluster), y = Count, fill = Organoid)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # STATISTICAL SIGNIFICANCE
-# tests cluster count identity differences between samples  (not normalized)
+# tests cluster count identity differences between samples 
 chisq.test(shared_table)  
 
-# for small sample sizes:
+# for small sample sizes
 fisher.test(shared_table, simulate.p.value = TRUE, B = 10000)
 
-## SMALL P VALUES; INDICATE CLUSTER DISTRIBUTIONS DIFFER SIGNIFICANTLY BETWEEN M95/M96.
-
-# tests whether proportion of cells in each cluster differs significantly between orgs
 # each cluster individually using proportion test
 for (i in 1:nrow(shared_table)) {
   cat("Cluster", rownames(shared_table)[i], "\n")
@@ -1000,24 +1037,65 @@ cluster_props$organoid <- case_when(
   TRUE ~ NA_character_
 )
 
-# Boxplot of proportions
+# proportion boxplot (old)
 ggplot(cluster_props, aes(x = NK_ILC1_clusters, y = prop, fill = organoid)) +
   geom_boxplot(outlier.shape = NA) +
-  geom_jitter(width = 0.2, size = 1.5, alpha = 0.7) +
+  geom_jitter(aes(color = organoid), width = 0.2, size = 1.5, alpha = 0.7) +
   labs(title = "Cluster Proportions per Sample by Organoid",
        x = "Cluster",
        y = "Proportion") +
   theme_minimal()
 
+# extract actual p-values per cluster from your loop and manually format
+pvals_df <- data.frame(
+  Cluster = as.factor(0:5),
+  pval = c(0.04384, 1.152e-05, 0.3267, 0.03869, 2.2e-16, 0.07369)
+)
+
+pvals_df$p_text <- paste0("p = ", signif(pvals_df$pval, 3))
+
+box_and_p <- ggplot(cluster_props, aes(x = as.factor(NK_ILC1_clusters), y = prop, fill = organoid)) +
+  geom_boxplot(
+    aes(group = interaction(NK_ILC1_clusters, organoid)),
+    position = position_dodge(width = 0.6),
+    outlier.shape = NA,
+    width = 0.5
+  ) +
+  geom_jitter(
+    aes(color = organoid),
+    position = position_jitterdodge(dodge.width = 0.6, jitter.width = 0.2),
+    size = 2,
+    alpha = 0.8
+  ) +
+  geom_text(data = pvals_df, 
+            aes(x = Cluster, y = 0.52, label = p_text), 
+            inherit.aes = FALSE, 
+            size = 3.8) +
+  scale_fill_manual(values = c("m95" = "lightpink", "m96" = "lightblue")) +
+  scale_color_manual(values = c("m95" = "red3", "m96" = "blue3")) +
+  labs(
+    title = "Cluster Proportions per Sample by Organoid",
+    x = "Cluster",
+    y = "Proportion"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.grid.major.x = element_blank()
+  )
+
+box_and_p
+ggsave("cluster_proportions.png", plot = box_and_p, width = 8, height = 6, dpi = 600)
+
 heat_df <- dcast(cluster_props, orig.ident + organoid ~ NK_ILC1_clusters, value.var = "prop")
 
-heat_df[is.na(heat_df)] <- 0 # replace na w 0
+heat_df[is.na(heat_df)] <- 0 
 rownames(heat_df) <- heat_df$orig.ident
-heat_data <- as.matrix(heat_df[, -(1:2)])  # remove sample and org columns
+heat_data <- as.matrix(heat_df[, -(1:2)])  
 
 # annotation with matching rownames
 annotation_row <- data.frame(Organoid = heat_df$organoid)
-rownames(annotation_row) <- heat_df$orig.ident  # must match rownames of heat_data
+rownames(annotation_row) <- heat_df$orig.ident  
 
 pheatmap::pheatmap(heat_data, 
                    cluster_rows = TRUE, 
@@ -1026,7 +1104,7 @@ pheatmap::pheatmap(heat_data,
                    main = "Cluster Proportion Heatmap")
 
 # normalized cluster props
-prop_df <- as.data.frame(prop.table(shared_table, margin = 2))  # column-normalized
+prop_df <- as.data.frame(prop.table(shared_table, margin = 2)) 
 colnames(prop_df) <- c("Cluster", "Organoid", "Proportion")
 
 ggplot(prop_df, aes(x = Cluster, y = Proportion, fill = Organoid)) +
@@ -1035,14 +1113,24 @@ ggplot(prop_df, aes(x = Cluster, y = Proportion, fill = Organoid)) +
        y = "Proportion", x = "Cluster") +
   theme_minimal()
 
-# For comparison between organoids (DE) use merged object with organoidid as metadata col (merged_object$organoid) -> allows comparisons while correcting sample effects
 ```
 
 # Maturation/Exhaustion
 
 ```{r DEA, echo = TRUE}
 # general subset markers wrt other cells; add organoid; fc <= 0.2; DESeq2
-NK_and_ILC1_markers <- FindAllMarkers(NK_and_ILC1, min.pct = 0.25, logfc.threshold = 0.2, group.by = "NK_ILC1_clusters")
+Idents(NK_and_ILC1) <- "NK_ILC1_clusters"
+
+# Differential expression using DESeq2 and accounting for organoid as latent variable
+#NK_and_ILC1_markers <- FindAllMarkers(
+  #object = NK_and_ILC1,
+  #test.use = "DESeq2",
+  #min.pct = 0.25,
+  #logfc.threshold = 0.2,
+  #group.by = "NK_ILC1_clusters",
+  #latent.vars = "organoid"
+#)
+
 head(NK_and_ILC1_markers)
 
 # sub
@@ -1062,10 +1150,16 @@ DoHeatmap(NK_and_ILC1, features = top10pos$gene, group.by = "NK_ILC1_clusters")
 DoHeatmap(NK_and_ILC1, features = top10neg$gene, group.by = "NK_ILC1_clusters")
 
 # maturation
-maturation_genes <- c("Itgam", "Klrg1", "Cd27") 
+maturation_genes <- c("Itgam", "Klrg1", "Cd27")
+NK_and_ILC1$organoid <- factor(NK_and_ILC1$organoid, levels = c("m96", "m95"))
+
+vln_colors <- c("m96" = "lightblue", "m95" = "pink")
+
 FeaturePlot(NK_and_ILC1, features = maturation_genes, min.cutoff = 'q10', reduction = "umap", split.by = "organoid")
 VlnPlot(NK_and_ILC1, features = maturation_genes, group.by = "NK_ILC1_clusters", split.by = "organoid", pt.size = 0, cols = c("lightblue", "pink")) 
-DotPlot(NK_and_ILC1, features = maturation_genes, group.by = "NK_ILC1_clusters", split.by = "organoid", cols = c("lightblue", "pink")) + RotatedAxis()
+levels(NK_and_ILC1$organoid)
+
+DotPlot(NK_and_ILC1, features = maturation_genes, group.by = "NK_ILC1_clusters", split.by = "organoid", cols = c("pink", "lightblue")) + RotatedAxis()
 RidgePlot(NK_and_ILC1, features = maturation_genes, ncol = 3, group.by = "NK_ILC1_clusters") 
 DoHeatmap(NK_and_ILC1, features = maturation_genes, size = 3) 
 FeatureScatter(NK_and_ILC1, feature1 = "Klrg1", feature2 = "Cd27")
@@ -1081,9 +1175,40 @@ VlnPlot(NK_and_ILC1, features = exhaustion_genes1, group.by = "NK_ILC1_clusters"
 FeaturePlot(NK_and_ILC1, features = exhaustion_genes2, min.cutoff = 'q10', reduction = "umap", split.by = "NK_ILC1_clusters")
 VlnPlot(NK_and_ILC1, features = exhaustion_genes2, group.by = "NK_ILC1_clusters", pt.size = 0)
 
+
+features <- c("Tcf7", "Tox", "Tigit", "Nfatc1", "Nfatc3", "Nfat5", "Nr4a1", "Nr4a2", "Nr4a3", "Ctla4", "Prdm1")
+
+vln_list <- lapply(features, function(gene) {
+  VlnPlot(
+    object = NK_and_ILC1,
+    features = gene,
+    group.by = "NK_ILC1_clusters",
+    pt.size = 0,
+    combine = FALSE
+  )[[1]] +
+    ggtitle(gene) +
+    theme_minimal(base_size = 10) +
+    theme(
+      axis.title.x = element_blank(),
+      #axis.title.y = element_blank(),  # Suppress individual y labels
+      plot.title = element_text(face = "bold", hjust = 0.5, size = 10),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+      axis.text.y = element_text(size = 7),
+      legend.position = "none"
+    )
+})
+
+wrap_plots(vln_list, ncol = 4)  
+
+vln_grid <- wrap_plots(vln_list, ncol = 4)
+ggsave("updated_06_24/exhaustion_violin_grid.png", plot = vln_grid, width = 10, height = 6, dpi = 600)
+
+
 DotPlot(NK_and_ILC1, features = exhaustion_genes1, group.by = "NK_ILC1_clusters", split.by = "organoid", cols = c("lightblue", "pink")) + RotatedAxis()
 
 DotPlot(NK_and_ILC1, features = exhaustion_genes2, group.by = "NK_ILC1_clusters", split.by = "organoid", cols = c("lightblue", "pink")) + RotatedAxis()
+
+DotPlot(NK_and_ILC1, features = exhaustion_genes, group.by = "NK_ILC1_clusters", split.by = "organoid", cols = c("lightblue", "pink")) + RotatedAxis()
 
 NK_and_ILC1 <- AddModuleScore(
   NK_and_ILC1,
@@ -1101,152 +1226,262 @@ NK_and_ILC1 <- AddModuleScore(
 VlnPlot(NK_and_ILC1, features = "Exhaustion_sig1", split.by = "organoid", group.by = "NK_ILC1_clusters")
 ```
 
-# Cytokines, markers (from literature), DE between organoids (general)
+# cNK vs trNK
 
-```{r cytokines, echo = TRUE}
-cytokine_ligands <- c("Ifng", "Tnf", "Il2", "Il10", "Il12a", "Il18", "Il1b", "Il15")
-cytokine_receptors <- c("Il2rb", "Il2rg", "Il10ra", "Il10rb", "Il12rb1", "Il12rb2", "Il18r1", "Il1r1", "Il15ra", "Klrd1", "Ncr1", "Klrc2", "Klrb1c", "Klre1", "Klra7")
+```{r c vs tr, echo = TRUE}
+# import gene lists
+gene_sets <- read_excel("/Users/gerdalukosiute/Downloads/Thesis/analysis_mCRC/circ_vs_TR_genes.xlsx", sheet = 1, skip = 1)
+colnames(gene_sets) <- make.names(colnames(gene_sets))
 
-DotPlot(NK_and_ILC1, features = cytokine_ligands, group.by = "NK_ILC1_clusters", split.by = "organoid") + RotatedAxis()
-DotPlot(NK_and_ILC1, features = cytokine_receptors, group.by = "NK_ILC1_clusters", split.by = "organoid") + RotatedAxis()
+# extract gene lists
+residency_genes     <- na.omit(gene_sets$Residency.score..Milner.et.al.) %>% as.character()
+circulating_genes   <- na.omit(gene_sets$Circulating.score..Milner.et.al.) %>% as.character()
+ILC1_genes          <- na.omit(gene_sets$ILC1.score..Lopes.et.al.) %>% as.character()
+cNK_genes           <- na.omit(gene_sets$cNK.score..Lopes.et.al.) %>% as.character()
 
-#ILC1 markers -> Tbx21, Ifng, Il7r, Cxcr6, Gzma, Cxcr3, Cd49a, Cd69, Il2ra, Tnfsf10 (TRAIL), Cd73
-# NK markers -> Eomes, Nkg7, Gzmb, Prf1, Klrb1c, Klrc1
-marker_genes <- c("Tbx21", "Ifng", "Eomes", "Nkg7", "Gzmb", "Klrb1c", "Prf1", "Gzma", "Il7r", "Cxcr6", "Cxcr3", "Cd49a", "Cd69", "Il2ra", "Tnfsf10", "Ctsw", "Txk", "Cd7")
-DotPlot(NK_and_ILC1, features = marker_genes, group.by = "NK_ILC1_clusters", split.by = "organoid") + RotatedAxis()
+# module scores
+NK_and_ILC1 <- AddModuleScore(NK_and_ILC1, features = list(residency_genes), name = "Residency")
+NK_and_ILC1 <- AddModuleScore(NK_and_ILC1, features = list(circulating_genes), name = "Circulating")
+NK_and_ILC1 <- AddModuleScore(NK_and_ILC1, features = list(ILC1_genes), name = "ILC1")
+NK_and_ILC1 <- AddModuleScore(NK_and_ILC1, features = list(cNK_genes), name = "cNK")
 
-#DEGs by organoids
-Idents(NK_and_ILC1) <- "organoid"
-organoid_DEGs <- FindMarkers(NK_and_ILC1, ident.1 = "m95", ident.2 = "m96", logfc.threshold = 0.2, min.pct = 0.25) 
-head(organoid_DEGs[order(organoid_DEGs$p_val_adj), ])
+# plot c("Residency1", "Circulating1", "ILC11", "cNK1", "CD56dim1", "CD56bright1")
+VlnPlot(NK_and_ILC1, features = "ILC11", split.by = "organoid", group.by = "NK_ILC1_clusters", pt.size = 0.1)
+VlnPlot(NK_and_ILC1, features = "cNK1", split.by = "organoid", group.by = "NK_ILC1_clusters", pt.size = 0.1)
+VlnPlot(NK_and_ILC1, features = "Circulating1", split.by = "organoid", group.by = "NK_ILC1_clusters", pt.size = 0.1)
+VlnPlot(NK_and_ILC1, features = "Residency1", split.by = "organoid", group.by = "NK_ILC1_clusters", pt.size = 0.1)
 
-organoid_DEGs %>%
-  filter(p_val_adj < 0.05 & abs(avg_log2FC) > 0.2) %>%
-  arrange(desc(abs(avg_log2FC))) %>%
-  head(20)
+# features
+score_features1 <- c("ILC11", "cNK1")
+score_features2 <- c("Circulating1", "Residency1")
 
-top_deg <- rownames(organoid_DEGs %>% top_n(10, wt = abs(avg_log2FC)))
-DoHeatmap(NK_and_ILC1, features = top_deg, group.by = "organoid") + ggtitle("Top DEGs between m95 and m96")
+# plots with custom median
+custom_score_plots1 <- lapply(score_features1, function(feature) {
+  midpoint_val <- median(NK_and_ILC1@meta.data[[feature]], na.rm = TRUE)
+  
+  FeaturePlot(NK_and_ILC1, features = feature, reduction = "umap", slot = "data") +
+    scale_color_gradient2(
+      low = "purple",
+      mid = "white",
+      high = "red",
+      midpoint = midpoint_val
+    ) +
+    ggtitle(paste0(feature, " (mid=", round(midpoint_val, 3), ")")) +
+    theme_minimal()
+})
 
-symbols <- symbols[match(rownames(organoid_DEGs), names(symbols))]
-rownames(organoid_DEGs) <- symbols
-keep <- !is.na(rownames(organoid_DEGs))
-organoid_DEGs <- organoid_DEGs[keep,]
+# display
+wrap_plots(custom_score_plots1)
 
-EnhancedVolcano(organoid_DEGs,
-    lab = rownames(organoid_DEGs),
-    x = 'avg_log2FC',
-    y = 'p_val_adj',
-    title = 'm95 vs m96',
-    pCutoff = 0.05,
-    FCcutoff = 0.2)
+custom_score_plots2 <- lapply(score_features2, function(feature) {
+  midpoint_val <- median(NK_and_ILC1@meta.data[[feature]], na.rm = TRUE)
+  
+  FeaturePlot(NK_and_ILC1, features = feature, reduction = "umap", slot = "data") +
+    scale_color_gradient2(
+      low = "purple",
+      mid = "white",
+      high = "red",
+      midpoint = midpoint_val
+    ) +
+    ggtitle(paste0(feature, " (mid=", round(midpoint_val, 3), ")")) +
+    theme_minimal()
+})
+
+# display
+wrap_plots(custom_score_plots2)
+
+combined_plot1 <- wrap_plots(custom_score_plots1, ncol = 2)
+combined_plot2 <- wrap_plots(custom_score_plots2, ncol = 2)
+
+# save them
+ggsave("updated_06_24/ILC1_cNK_scores_umap.png", plot = combined_plot1, dpi = 600, width = 8, height = 4)
+ggsave("updated_06_24/Circulating_Residency_scores_umap.png", plot = combined_plot2, dpi = 600, width = 8, height = 4)
 
 ```
 
-## DEGs between organoids for each cluster
+# Volcano (3+0 vs. others)
 
-``` {r degs, echo = TRUE}
-
+```{r comp, echo = TRUE}
 Idents(NK_and_ILC1) <- "NK_ILC1_clusters"
-de_results_list <- list()
+# exclude ILC1s
+NK_and_ILC1 <- subset(NK_and_ILC1, NK_and_ILC1$NK_ILC1_clusters %in% c(0, 1, 2, 3, 5))
 
-for (cluster_id in 0:5) {
-  message(paste("Processing cluster", cluster_id))
+# define group
+NK_and_ILC1$pseudobulk_group <- paste0(
+  ifelse(NK_and_ILC1$NK_ILC1_clusters %in% c(0, 3), "0_3", "others"), "_",
+  NK_and_ILC1$organoid
+)
 
-  cluster_cells <- subset(NK_and_ILC1, idents = as.character(cluster_id))
-  cluster_cells$organoid <- factor(cluster_cells$organoid)
-  Idents(cluster_cells) <- "organoid"
+counts <- GetAssayData(NK_and_ILC1, slot = "counts")
+meta <- NK_and_ILC1@meta.data
 
-  de_res <- FindMarkers(
-    cluster_cells,
-    ident.1 = "m95",
-    ident.2 = "m96",
-    test.use = "DESeq2",
-    logfc.threshold = 0.2
-  )
+# sum counts by group
+pseudobulk_counts <- tapply(colnames(counts), meta$pseudobulk_group, function(cells) {
+  Matrix::rowSums(counts[, cells, drop = FALSE])
+})
+pseudobulk_counts <- do.call(cbind, pseudobulk_counts)
 
-  de_results_list[[paste0("cluster", cluster_id)]] <- de_res
+sample_meta <- data.frame(
+  group = gsub("_.*", "", colnames(pseudobulk_counts)),
+  organoid = gsub(".*_", "", colnames(pseudobulk_counts))
+)
+rownames(sample_meta) <- colnames(pseudobulk_counts)
 
-  top_genes <- rownames(de_res)[1:10]
+sample_meta$group <- factor(sample_meta$group)
+sample_meta$organoid <- factor(sample_meta$organoid)
 
-  print(
-    VlnPlot(cluster_cells, features = top_genes, split.by = "organoid", pt.size = 0) +
-    ggtitle(paste("Cluster", cluster_id, "- Top DE Genes"))
-  )
+dds <- DESeqDataSetFromMatrix(
+  countData = pseudobulk_counts,
+  colData = sample_meta,
+  design = ~ organoid + group
+)
 
-  print(
-    DoHeatmap(cluster_cells, features = top_genes, group.by = "organoid") +
-    ggtitle(paste("Cluster", cluster_id, "- Top DE Genes Heatmap"))
-  )
+dds <- DESeq(dds)
 
-  print(
-    EnhancedVolcano(
-      de_res,
-      lab = rownames(de_res),
-      x = "avg_log2FC",
-      y = "p_val", # if using adjusted, nothing significant is shown (except c4)
-      pCutoff = 0.05,
-      FCcutoff = 0.2,
-      title = paste("Volcano Plot - Cluster", cluster_id),
-      subtitle = "DESeq2: m95 vs m96",
-      pointSize = 2.5,
-      labSize = 3.5
+resultsNames(dds)
+res <- results(dds, contrast = c("group", "0", "others")) 
+res_df <- as.data.frame(res)
+res_df$gene <- rownames(res_df)
+
+# significance annotation
+res_df <- res_df %>%
+  mutate(
+    sig = case_when(
+      padj < 0.05 & log2FoldChange > 0.2 ~ "Up in clusters 0 + 3",
+      padj < 0.05 & log2FoldChange < -0.2 ~ "Up in other clusters",
+      TRUE ~ "Not significant"
     )
   )
-  
-  print(
-  DotPlot(cluster_cells, features = top_genes, 
-          group.by = "NK_ILC1_clusters", split.by = "organoid") +
-    RotatedAxis() +
-    ggtitle(paste("DotPlot - Top DEGs in Cluster", cluster_id))
-  )
-}
 
+volcano <- ggplot(res_df, aes(x = log2FoldChange, y = -log10(padj), color = sig)) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  scale_color_manual(values = c(
+    "Up in clusters 0 + 3" = "firebrick",
+    "Up in other clusters" = "steelblue",
+    "Not significant" = "gray80"
+  )) +
+  geom_vline(xintercept = c(-0.2, 0.2), linetype = "dashed") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
+  labs(
+    x = expression(Log[2]~fold~change),
+    y = expression(-Log[10]~adjusted~italic(P)),
+    color = NULL,
+    title = "Pseudobulk DE: clusters 0 + 3 vs others"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "top") +
+  geom_text_repel(
+    data = res_df %>% filter(padj < 0.01 & abs(log2FoldChange) > 1),
+    aes(label = gene),
+    #color = "black",
+    size = 3,
+    max.overlaps = 1000,
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.color = "gray40"
+  )
+
+ggsave("updated_06_24/pseudo_volcano2.pdf", volcano, width = 8, height = 6)
 ```
 
-## GSEA (for DEGs across organoids for each cluster); nothing comes up except for 1 pathway in c5
+# Plot of features to explain the exhaustion signature
 
-``` {r degs_gsea, echo = TRUE}
-library(clusterProfiler)
-library(org.Mm.eg.db)
-organism <- org.Mm.eg.db
+``` {r plot, echo = TRUE}
+# genes
+genes_of_interest <- c("Tcf7", "Emb", "Kit", "Klrg1", "Itgam", "Gzma") 
 
-gsea_results_list <- list()
+# grouping var
+NK_and_ILC1$cluster.organoid <- paste0(NK_and_ILC1$NK_ILC1_clusters, "_", NK_and_ILC1$organoid)
 
-for (cluster_name in names(de_results_list)) {
-  message(paste("Running GSEA for", cluster_name))
-  
-  de_res <- de_results_list[[cluster_name]]
-  
-  ranked_genes <- de_res$avg_log2FC
-  names(ranked_genes) <- rownames(de_res)
-  ranked_genes <- sort(ranked_genes, decreasing = TRUE)
-  
-  gsea_res <- tryCatch({
-    gseGO(
-      geneList = ranked_genes,
-      OrgDb = organism,
-      keyType = "SYMBOL",
-      ont = "ALL",
-      pAdjustMethod = "BH",
-      pvalueCutoff = 0.05,
-      verbose = FALSE
-    )
-  }, error = function(e) {
-    message(paste("No enrichments for", cluster_name, "- skipping."))
-    return(NULL)
-  })
-  
-  if (!is.null(gsea_res) && nrow(gsea_res@result) > 0) {
-    gsea_results_list[[cluster_name]] <- gsea_res
-    
-    print(dotplot(gsea_res, showCategory = 20) + ggtitle(paste("GSEA -", cluster_name)))
-    
-    top5 <- head(gsea_res@result[order(gsea_res@result$p.adjust), ], 5)
-    top5_ids <- match(top5$ID, gsea_res@result$ID)
-    print(gseaplot2(gsea_res, geneSetID = top5_ids, title = paste("Top 5 Pathways -", cluster_name)))
-  } else {
-    message(paste("No significant pathways found for", cluster_name))
-  }
-}
+# table for % expr per gene
+freq_table <- lapply(genes_of_interest, function(gene) {
+  FetchData(NK_and_ILC1, vars = c(gene, "NK_ILC1_clusters", "organoid")) %>%
+    mutate(positive = !!sym(gene) > 0) %>%
+    group_by(NK_ILC1_clusters, organoid) %>%
+    summarise(freq = 100 * sum(positive) / n(), .groups = "drop") %>%
+    mutate(Gene = gene)
+}) %>% bind_rows()
+
+colnames(freq_table) <- c("Cluster", "Organoid", "Frequency", "Gene")
+
+frq_plot <- ggplot(freq_table, aes(x = Gene, y = Frequency, fill = Organoid)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  facet_wrap(~Cluster, nrow = 2) +
+  scale_fill_manual(values = c("m95" = "lightblue", "m96" = "pink")) +
+  labs(y = "% of Cells Expressing", x = "Gene", fill = "Organoid") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave("updated_06_24/expr_frequency.png", frq_plot, width = 10, height = 6)
+```
+
+# Feature plot (residency by org)
+
+```{r res, echo = TRUE}
+# midpoint
+midpoint_val <- median(NK_and_ILC1@meta.data$Residency1, na.rm = TRUE)
+
+Residency1_split_plot <- FeaturePlot(
+  NK_and_ILC1,
+  features = "Residency1",
+  reduction = "umap",
+  split.by = "organoid",     
+  slot = "data"
+) & 
+  scale_color_gradient2(
+    low = "purple",
+    mid = "white",
+    high = "red",
+    midpoint = midpoint_val
+  ) &
+  theme_minimal() &
+  ggtitle(paste0("Residency1 (mid=", round(midpoint_val, 3), ")"))
+
+Residency1_split_plot
+```
+
+# Test of significance for tissue residency difference in organoids
+
+```{r test, echo = TRUE}
+# boxplot
+residency_box <- ggplot(NK_and_ILC1@meta.data, aes(x = organoid, y = Residency1, fill = organoid)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, size = 1, alpha = 0.5) +
+  labs(title = "Residency1 Score by Organoid", x = NULL, y = "Residency1 Module Score") +
+  scale_fill_manual(values = c("m95" = "pink", "m96" = "lightblue")) +
+  theme_minimal(base_size = 12)
+
+# wilcoxon test
+residency_test <- wilcox.test(Residency1 ~ organoid, data = NK_and_ILC1@meta.data)
+residency_test$p.value
+
+residency_box + 
+  annotate("text", x = 1.5, y = max(NK_and_ILC1@meta.data$Residency1, na.rm = TRUE), 
+           label = paste0("p = ", signif(residency_test$p.value, 3)), size = 4)
+
+
+# pseudobulk + wicoxon
+pseudobulk_scores <- NK_and_ILC1@meta.data %>%
+  group_by(orig.ident, organoid) %>%
+  summarise(mean_score = mean(Residency1, na.rm = TRUE)) %>%
+  ungroup()
+
+print(pseudobulk_scores)
+
+wilcox_res <- wilcox.test(mean_score ~ organoid, data = pseudobulk_scores)
+p_val <- signif(wilcox_res$p.value, digits = 3)
+
+ggplot(pseudobulk_scores, aes(x = organoid, y = mean_score, fill = organoid)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.1, size = 3, alpha = 0.8) +
+  theme_minimal(base_size = 13) +
+  labs(
+    y = "Residency1 (pseudobulk mean)",
+    title = "Residency1 Pseudobulk Score by Organoid"
+  ) +
+  scale_fill_manual(values = c("m95" = "pink", "m96" = "lightblue")) +
+  annotate("text", x = 1.5, y = max(pseudobulk_scores$mean_score) + 0.02,
+           label = paste("p =", p_val), size = 5)
+
+
 ```
